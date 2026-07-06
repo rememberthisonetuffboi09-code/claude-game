@@ -297,6 +297,8 @@ func take_hit(damage: float, is_finisher: bool = false, from_pos: Vector2 = Vect
 	if staggered:
 		core_hp = maxf(0.0, core_hp - damage)
 		core_flash_t = 0.3
+		get_tree().call_group("main", "hit_stop", 0.22 if is_finisher else 0.06)
+		get_tree().call_group("main", "add_shake", 12.0 if is_finisher else 4.0)
 		if phase == 1 and core_hp <= CORE_HP_MAX * 0.5:
 			phase = 2
 			phase_changed.emit()
@@ -310,6 +312,8 @@ func take_hit(damage: float, is_finisher: bool = false, from_pos: Vector2 = Vect
 		var flash_pos := to_local(from_pos) if from_pos != Vector2.ZERO \
 				else Vector2(float(-facing) * BODY_HALF_W, -120.0)
 		at_flashes.append({"pos": flash_pos, "t": 0.35})
+		get_tree().call_group("main", "hit_stop", 0.035)
+		get_tree().call_group("main", "add_shake", 2.5)
 		if at_field <= 0.0:
 			_start_stagger()
 

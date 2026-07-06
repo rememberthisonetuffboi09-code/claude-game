@@ -68,11 +68,26 @@ becomes unfair and *feels* worse despite looking better.
 
 ## Canvas / scale reference
 
-Placeholder sizes (art can overhang these — gameplay hitboxes stay in code):
+The placeholder models ARE the scale reference: match their proportions and
+your sprites will drop in at the correct size. Exact placeholder dimensions
+(origin = feet at y0, art may overhang — gameplay hitboxes stay in code):
 
-- **Unit-01**: ~48 × 152 px world size. Draw at 2× (96 × 304 canvas,
-  ~128 × 320 with room for effects), set the sprite's scale to 0.5.
-- **Sachiel**: ~190 × 235 px world size. Same 2× approach (~448 × 512 canvas).
+| | World size | Landmarks (y from feet) |
+|---|---|---|
+| **Unit-01** | 72 wide (pylon to pylon) × 160 tall, 198 with horn | pelvis −64…−86, chest top −126, pylons −120…−142, head −134…−160, eye ≈ −149 |
+| **Sachiel** | ~184 wide (hand to hand) × 236 tall | legs to −90, core center −95, face mask −148…−198, hump top −220 |
+
+Workflow: draw at **2× world size** and set the sprite's `scale` to 0.5 —
+crisp at native zoom, and you keep resolution headroom.
+
+- **Unit-01 canvas**: 192 × 448 px (character ~144 × 400 within it,
+  margin for smears and effects)
+- **Sachiel canvas**: 448 × 512 px (character ~368 × 472 within it)
+
+Sanity check before committing to a style: draw ONE pose of Unit-01 at that
+size, drop it in as a single-frame `idle`, and stand next to Sachiel in game.
+Adjust proportions until the matchup silhouette feels right, THEN batch the
+remaining animations.
 
 ## Tools & export
 

@@ -16,25 +16,65 @@ shape = SubResource("RectangleShape2D_body")
 
 [node name="Visual" type="Node2D" parent="."]
 
-[node name="Body" type="Polygon2D" parent="Visual"]
+[node name="ArmBack" type="Polygon2D" parent="Visual"]
+color = Color(0.11, 0.14, 0.12, 1)
+polygon = PackedVector2Array(58, -180, 84, -176, 78, -60, 54, -66)
+
+[node name="HandBack" type="Polygon2D" parent="Visual"]
+color = Color(0.1, 0.13, 0.11, 1)
+polygon = PackedVector2Array(50, -64, 88, -62, 86, -34, 48, -36)
+
+[node name="LegBack" type="Polygon2D" parent="Visual"]
+color = Color(0.12, 0.16, 0.13, 1)
+polygon = PackedVector2Array(26, -88, 54, -90, 58, 0, 30, 0)
+
+[node name="FootBack" type="Polygon2D" parent="Visual"]
+color = Color(0.11, 0.15, 0.12, 1)
+polygon = PackedVector2Array(26, 0, 68, 0, 64, -14, 28, -12)
+
+[node name="LegFront" type="Polygon2D" parent="Visual"]
+color = Color(0.14, 0.18, 0.15, 1)
+polygon = PackedVector2Array(-56, -90, -28, -88, -32, 0, -60, 0)
+
+[node name="FootFront" type="Polygon2D" parent="Visual"]
+color = Color(0.13, 0.17, 0.14, 1)
+polygon = PackedVector2Array(-72, 0, -30, 0, -32, -12, -68, -14)
+
+[node name="Pelvis" type="Polygon2D" parent="Visual"]
+color = Color(0.19, 0.24, 0.2, 1)
+polygon = PackedVector2Array(-50, -82, 48, -82, 40, -122, -42, -122)
+
+[node name="Torso" type="Polygon2D" parent="Visual"]
 color = Color(0.16, 0.2, 0.17, 1)
-polygon = PackedVector2Array(-70, -235, 70, -235, 95, 0, -95, 0)
+polygon = PackedVector2Array(-44, -118, 42, -118, 58, -188, -60, -188)
 
-[node name="Shoulders" type="Polygon2D" parent="Visual"]
-color = Color(0.2, 0.25, 0.21, 1)
-polygon = PackedVector2Array(-70, -235, 70, -235, 80, -180, -80, -180)
+[node name="Hump" type="Polygon2D" parent="Visual"]
+color = Color(0.18, 0.23, 0.19, 1)
+polygon = PackedVector2Array(-60, -188, 58, -188, 34, -220, -38, -220)
 
-[node name="Face" type="Polygon2D" parent="Visual"]
+[node name="HeadNub" type="Polygon2D" parent="Visual"]
+color = Color(0.16, 0.2, 0.17, 1)
+polygon = PackedVector2Array(-26, -220, 24, -220, 16, -236, -18, -236)
+
+[node name="ArmFront" type="Polygon2D" parent="Visual"]
+color = Color(0.13, 0.17, 0.14, 1)
+polygon = PackedVector2Array(-88, -178, -62, -182, -56, -64, -80, -60)
+
+[node name="HandFront" type="Polygon2D" parent="Visual"]
+color = Color(0.12, 0.16, 0.13, 1)
+polygon = PackedVector2Array(-92, -62, -52, -66, -50, -36, -90, -34)
+
+[node name="FaceMask" type="Polygon2D" parent="Visual"]
 color = Color(0.85, 0.82, 0.7, 1)
-polygon = PackedVector2Array(-28, -215, 28, -215, 20, -160, -20, -160)
+polygon = PackedVector2Array(-30, -198, 26, -198, 18, -148, -24, -148)
 
 [node name="EyeLeft" type="Polygon2D" parent="Visual"]
-color = Color(0.1, 0.08, 0.06, 1)
-polygon = PackedVector2Array(-15, -200, -5, -200, -5, -191, -15, -191)
+color = Color(0.08, 0.07, 0.05, 1)
+polygon = PackedVector2Array(-18, -186, -8, -186, -8, -177, -18, -177)
 
 [node name="EyeRight" type="Polygon2D" parent="Visual"]
-color = Color(0.1, 0.08, 0.06, 1)
-polygon = PackedVector2Array(5, -200, 15, -200, 15, -191, 5, -191)
+color = Color(0.08, 0.07, 0.05, 1)
+polygon = PackedVector2Array(2, -186, 12, -186, 12, -177, 2, -177)
 
 [node name="Core" type="Polygon2D" parent="Visual"]
 position = Vector2(0, -95)

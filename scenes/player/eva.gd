@@ -285,6 +285,8 @@ func take_hit(damage: float, from_x: float) -> void:
 	hp = maxf(0.0, hp - damage)
 	sync_ratio = maxf(0.0, sync_ratio - SYNC_LOSS_ON_HIT)
 	_flash_damage()
+	get_tree().call_group("main", "hit_stop", 0.09)
+	get_tree().call_group("main", "add_shake", 8.0)
 	if hp <= 0.0:
 		if not berserk_used and sync_ratio >= BERSERK_SYNC_MIN:
 			_start_berserk()

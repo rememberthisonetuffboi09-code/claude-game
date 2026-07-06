@@ -23,10 +23,13 @@ var battery := BATTERY_SECONDS
 var on_battery := false
 var match_over := false
 var shake := 0.0
+var hit_stop_active := false
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("main")
+	Engine.time_scale = 1.0
 	randomize()
 	_build_background()
 	_build_arena()
@@ -63,7 +66,8 @@ func _ready() -> void:
 	sachiel.at_field_broken.connect(
 			func():
 				hud.flash_message("AT FIELD NEUTRALIZED", "CORE EXPOSED - STRIKE NOW [K]", 2.5)
-				add_shake(14.0))
+				add_shake(14.0)
+				hit_stop(0.15))
 	sachiel.stagger_ended.connect(
 			func(): hud.flash_message("AT FIELD RESTORED", "", 1.5))
 	sachiel.phase_changed.connect(
@@ -78,6 +82,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("restart"):
+		Engine.time_scale = 1.0
 		get_tree().paused = false
 		get_tree().reload_current_scene()
 		return
@@ -89,7 +94,8 @@ func _process(delta: float) -> void:
 	# camera frames both combatants, weighted toward the pilot
 	var target: Vector2 = eva.global_position * 0.62 + sachiel.global_position * 0.38
 	camera.position = target + Vector2(0.0, -170.0)
-	shake = maxf(0.0, shake - 40.0 * delta)
+	# fast exponential falloff reads as impact, the linear term kills the tail
+	shake = maxf(0.0, shake - (shake * 6.0 + 8.0) * delta)
 	camera.offset = Vector2(randf_range(-shake, shake), randf_range(-shake, shake))
 
 
@@ -114,6 +120,19 @@ func add_shake(amount: float) -> void:
 	shake = maxf(shake, amount)
 
 
+## Freeze the whole game for a beat on big impacts. Combat scripts trigger it
+## via get_tree().call_group("main", "hit_stop", seconds).
+func hit_stop(duration: float, frozen_scale: float = 0.05) -> void:
+	if hit_stop_active or match_over:
+		return
+	hit_stop_active = true
+	Engine.time_scale = frozen_scale
+	# real-time timer: unaffected by the time_scale it is timing
+	await get_tree().create_timer(duration, true, false, true).timeout
+	Engine.time_scale = 1.0
+	hit_stop_active = false
+
+
 func _on_berserk() -> void:
 	add_shake(22.0)
 	hud.flash_message("UNIT-01 SIGNAL LOST", "... UNIT-01 HAS GONE BERSERK", 3.0)
@@ -127,6 +146,7 @@ func _on_angel_defeated() -> void:
 	if match_over:
 		return
 	add_shake(25.0)
+	hit_stop(0.45)
 	await get_tree().create_timer(1.2).timeout
 	_finish(true, "PATTERN BLUE ELIMINATED",
 			"TARGET SILENT  //  FINAL SYNC RATIO %.1f%%" % eva.sync_ratio)
