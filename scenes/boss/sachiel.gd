@@ -128,7 +128,7 @@ func _state_idle(delta: float) -> void:
 
 
 func _state_walk(delta: float) -> void:
-	var player := _get_player()
+	var player = _get_player()
 	if player == null:
 		_stand(delta)
 		return
@@ -151,7 +151,7 @@ func _state_spear(delta: float) -> void:
 	if not struck_this_attack and state_t >= windup:
 		struck_this_attack = true
 		strike_flash_t = 0.15
-		var player := _get_player()
+		var player = _get_player()
 		if player != null:
 			var d: Vector2 = player.global_position - global_position
 			if d.x * facing > -20.0 and absf(d.x) < BODY_HALF_W + SPEAR_REACH \
@@ -166,7 +166,7 @@ func _state_beam(delta: float) -> void:
 	var windup := BEAM_WINDUP_P2 if phase == 2 else BEAM_WINDUP
 	if state_t >= windup and state_t < windup + BEAM_FIRE_TIME:
 		if not struck_this_attack:
-			var player := _get_player()
+			var player = _get_player()
 			if player != null:
 				var center: Vector2 = player.global_position + Vector2(0.0, -60.0)
 				var closest := Geometry2D.get_closest_point_to_segment(center, beam_from, beam_to)
@@ -189,7 +189,7 @@ func _state_leap(delta: float) -> void:
 		struck_this_attack = true
 		shock_t = 0.35
 		landed.emit()
-		var player := _get_player()
+		var player = _get_player()
 		if player != null and player.is_on_floor() \
 				and absf(player.global_position.x - global_position.x) < SHOCKWAVE_RADIUS:
 			player.take_hit(LEAP_DAMAGE, global_position.x)
@@ -212,7 +212,7 @@ func _state_stagger(delta: float) -> void:
 # -- attack selection --------------------------------------------------------
 
 func _choose_attack() -> void:
-	var player := _get_player()
+	var player = _get_player()
 	if player == null:
 		_to_idle(0.5)
 		return
@@ -267,7 +267,7 @@ func _start_beam() -> void:
 	state_t = 0.0
 	struck_this_attack = false
 	beam_from = global_position + FACE_OFFSET
-	var player := _get_player()
+	var player = _get_player()
 	var target := beam_from + Vector2(float(facing) * 800.0, 120.0)
 	if player != null:
 		target = player.global_position + Vector2(0.0, -60.0)
@@ -282,7 +282,7 @@ func _start_leap() -> void:
 	struck_this_attack = false
 	leap_from = global_position
 	var target_x := global_position.x + float(facing) * 400.0
-	var player := _get_player()
+	var player = _get_player()
 	if player != null:
 		target_x = player.global_position.x
 	leap_to = Vector2(clampf(target_x, arena_left, arena_right), global_position.y)
@@ -365,7 +365,7 @@ func _stand(delta: float) -> void:
 
 
 func _face_player() -> void:
-	var player := _get_player()
+	var player = _get_player()
 	if player == null:
 		return
 	facing = 1 if player.global_position.x >= global_position.x else -1

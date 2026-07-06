@@ -192,7 +192,7 @@ func _state_finisher(_delta: float) -> void:
 	if not struck and state_t >= FINISHER_STRIKE_T:
 		struck = true
 		slash_t = 0.3
-		var boss := _get_boss()
+		var boss = _get_boss()
 		if boss != null:
 			boss.take_hit(FINISHER_DAMAGE * _damage_mult(), true, global_position)
 			_gain_sync(SYNC_FINISHER)
@@ -243,7 +243,7 @@ func _start_attack(step: int) -> void:
 
 
 func _try_finisher() -> void:
-	var boss := _get_boss()
+	var boss = _get_boss()
 	if boss == null or not boss.staggered:
 		return
 	var core: Vector2 = boss.core_global_position()
@@ -263,7 +263,7 @@ func _try_finisher() -> void:
 
 func _melee_strike(base_damage: float) -> void:
 	slash_t = 0.25
-	var boss := _get_boss()
+	var boss = _get_boss()
 	if boss == null:
 		return
 	var probe := global_position + Vector2(facing * COMBO_REACH * 0.6, -60.0)
