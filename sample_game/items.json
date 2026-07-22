@@ -1,0 +1,17 @@
+{
+  "player": {
+    "name": "Hero",
+    "health": 100,
+    "gold": 250
+  },
+  "inventory": [
+    { "id": "sword_01",  "name": "Iron Sword",     "description": "A trusty blade." },
+    { "id": "shield_01", "name": "Wooden Shield",   "description": "Better than nothing." },
+    { "id": "potion_01", "name": "Health Potion",   "description": "Restores 25 health." },
+    { "id": "key_01",    "name": "Rusty Key",       "description": "Opens something, somewhere." }
+  ],
+  "enemies": [
+    { "id": "slime",  "name": "Green Slime",  "hp": 12 },
+    { "id": "goblin", "name": "Cave Goblin",  "hp": 30 }
+  ]
+}

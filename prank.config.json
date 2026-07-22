@@ -1,0 +1,18 @@
+{
+  "friend_name": "friend",
+  "game_name": "the game",
+  "target_dir": "sample_game",
+  "claude_mode": "auto",
+  "model": "claude-opus-4-8",
+  "persona": "",
+  "typing_delay": 0.35,
+  "word_swaps": {
+    "Sword": "Cursed Baguette",
+    "Shield": "Emotional Support Frisbee",
+    "Potion": "Suspicious Juice",
+    "Health": "Vibes",
+    "Gold": "Bottlecaps",
+    "treasure": "an unpaid invoice",
+    "Hero": "Chosen Intern"
+  }
+}

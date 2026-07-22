@@ -1,0 +1,8 @@
+=== VILLAGE OF OAKHOLLOW — DIALOGUE ===
+
+INNKEEPER: Welcome, traveler! You look tired. A room is 10 gold.
+BLACKSMITH: Bring me iron and I'll forge you something worthy.
+OLD MAN: They say a great treasure sleeps beneath the mountain.
+GUARD: Move along. Nothing to see here.
+
+QUEST: Retrieve the Rusty Key from the goblin cave and return it to the Innkeeper.

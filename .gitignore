@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Prank artifacts (backups + manifest live inside the target folder)
+*.prankbak
+.prank_manifest.json
+
+# Never commit real, copyrighted game files. Keep them out of the repo and point
+# target_dir at them locally instead. See README.md "On forking the game".
+/real_game/
+/game_files/

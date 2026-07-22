@@ -1,0 +1,3 @@
+# Only needed for the LIVE Claude backend. The prank runs fine without this in
+# scripted mode (claude_mode "auto" falls back automatically).
+anthropic>=0.40
