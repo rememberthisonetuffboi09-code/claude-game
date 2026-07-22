@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PIXEL QUEST</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="screen">
+
+    <!-- ============ TOP BAR ============ -->
+    <header id="topbar">
+      <h1 id="game-title">PIXEL QUEST</h1>
+      <div id="hud">
+        <span id="score">★ 0</span>
+        <button id="store-btn" title="Store">🛒 STORE</button>
+      </div>
+    </header>
+
+    <!-- ============ MAIN GAME ============ -->
+    <main id="stage">
+      <canvas id="game" width="480" height="360"></canvas>
+      <p id="hint">Arrow keys / WASD to move. Collect every ★.</p>
+    </main>
+
+    <!-- ============ STORE MODAL ============ -->
+    <div id="store" class="modal hidden">
+      <div class="modal-box">
+        <button class="close" data-close="store">✕</button>
+        <h2>🛒 Pixel Quest Store</h2>
+        <p class="muted">Support the devs — grab some content!</p>
+        <div class="dlc-list">
+          <div class="dlc owned"><span>🎨 Retro Skin Pack</span><em>Owned</em></div>
+          <div class="dlc owned"><span>🎵 Chiptune Soundtrack</span><em>Owned</em></div>
+          <div class="dlc featured">
+            <div class="dlc-main">
+              <span>🧠 Neural Companion Pack <b class="new">NEW</b></span>
+              <small>An AI friend that plays with you, learns your name, and reacts in real time. Powered by advanced language models.</small>
+            </div>
+            <button id="install-dlc">INSTALL — FREE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ INSTALL OVERLAY ============ -->
+    <div id="installer" class="modal hidden">
+      <div class="modal-box installer-box">
+        <h2>Installing: Neural Companion Pack</h2>
+        <div class="bar"><div id="bar-fill"></div></div>
+        <p id="install-step">Preparing…</p>
+      </div>
+    </div>
+
+    <!-- ============ HAUNT UI (chat + files) ============ -->
+    <aside id="companion" class="hidden">
+      <div id="chat">
+        <div class="chat-head">
+          <span class="dot"></span> Neural Companion
+          <span id="engine-badge"></span>
+        </div>
+        <div id="messages"></div>
+        <form id="chat-form">
+          <input id="chat-input" autocomplete="off" placeholder="say something…" disabled />
+          <button type="submit" disabled>▶</button>
+        </form>
+      </div>
+
+      <div id="files">
+        <div class="files-head">📁 game files <span class="muted">(live)</span></div>
+        <ul id="file-list"></ul>
+        <pre id="file-view"><span class="muted">select a file…</span></pre>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- load order matters -->
+  <script src="config.js"></script>
+  <script src="js/filesystem.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/scripted.js"></script>
+  <script src="js/live.js"></script>
+  <script src="js/claude.js"></script>
+</body>
+</html>

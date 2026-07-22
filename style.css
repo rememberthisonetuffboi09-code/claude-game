@@ -1,0 +1,193 @@
+:root {
+  --bg: #0f1226;
+  --panel: #1a1f3a;
+  --ink: #e8ecff;
+  --muted: #8b93c7;
+  --accent: #ffd166;
+  --good: #4ade80;
+  --wall: #2a3160;
+  --floor: #12162e;
+  --haunt: #ff3b6b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(1200px 700px at 50% -10%, #232a52, var(--bg));
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* pixel font vibe for titles */
+#game-title, #topbar h1, .installer-box h2 {
+  font-family: "Courier New", monospace;
+  letter-spacing: 2px;
+}
+
+#screen {
+  width: min(920px, 96vw);
+  background: var(--panel);
+  border: 2px solid #2a3160;
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.55);
+  overflow: hidden;
+  position: relative;
+  transition: filter .4s, transform .1s, width .5s ease;
+  display: flex;
+  flex-wrap: wrap;
+}
+/* when the companion is live, widen the shell so the game stays visible beside it */
+#screen.companion-open { width: min(1180px, 97vw); }
+
+/* ---------- top bar ---------- */
+#topbar {
+  flex: 1 1 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px;
+  background: linear-gradient(#20264a, #191d38);
+  border-bottom: 2px solid #2a3160;
+}
+#topbar h1 { margin: 0; font-size: 22px; color: var(--accent); }
+#hud { display: flex; align-items: center; gap: 14px; }
+#score { font-family: monospace; font-size: 18px; color: var(--accent); }
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: #313a6e;
+  color: var(--ink);
+  font-weight: 600;
+  transition: transform .08s, background .15s;
+}
+button:hover { background: #3c4788; }
+button:active { transform: translateY(1px); }
+
+/* ---------- stage ---------- */
+#stage { flex: 1 1 420px; display: grid; place-items: center; align-content: center; padding: 22px; position: relative; }
+#game {
+  image-rendering: pixelated;
+  background: var(--floor);
+  border: 2px solid #2a3160;
+  border-radius: 8px;
+  max-width: 100%;
+}
+#hint { color: var(--muted); font-size: 13px; margin: 12px 0 0; text-align: center; }
+
+/* ---------- modals ---------- */
+.modal {
+  position: absolute; inset: 0;
+  background: rgba(5,7,20,.72);
+  display: grid; place-items: center;
+  z-index: 20;
+}
+.modal.hidden, .hidden { display: none !important; }
+.modal-box {
+  position: relative;
+  width: min(560px, 90%);
+  background: var(--panel);
+  border: 2px solid #37407a;
+  border-radius: 14px;
+  padding: 22px 24px;
+}
+.modal-box h2 { margin: 0 0 4px; }
+.muted { color: var(--muted); }
+.close {
+  position: absolute; top: 10px; right: 10px;
+  background: transparent; font-size: 16px; padding: 4px 8px;
+}
+
+/* store */
+.dlc-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.dlc {
+  display: flex; align-items: center; justify-content: space-between;
+  background: #161a34; border: 1px solid #2a3160; border-radius: 10px; padding: 12px 14px;
+}
+.dlc.owned em { color: var(--good); font-style: normal; font-size: 13px; }
+.dlc.featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; align-items: stretch; }
+.dlc-main { display: flex; flex-direction: column; gap: 4px; padding-right: 12px; }
+.dlc-main small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.new { background: var(--haunt); color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 4px; vertical-align: middle; }
+#install-dlc { background: var(--accent); color: #201700; white-space: nowrap; align-self: center; }
+#install-dlc:hover { background: #ffdf8a; }
+
+/* installer */
+.installer-box { text-align: center; }
+.bar { height: 16px; background: #10142c; border-radius: 8px; overflow: hidden; margin: 18px 0 10px; border: 1px solid #2a3160; }
+#bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), var(--good)); transition: width .3s; }
+#install-step { font-family: monospace; color: var(--muted); min-height: 20px; }
+
+/* ---------- companion (chat + files) — docked beside the game ---------- */
+#companion {
+  flex: 1.5 1 480px;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  min-height: 420px;
+  border-left: 2px solid #2a3160;
+  animation: slidein .5s ease;
+}
+@keyframes slidein { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+
+#chat, #files {
+  display: flex; flex-direction: column;
+  background: #0c0f22;
+  min-height: 0;
+}
+#chat { border-right: 1px solid #2a3160; }
+
+.chat-head, .files-head {
+  padding: 10px 14px; font-weight: 700; font-size: 13px;
+  border-bottom: 1px solid #2a3160; display: flex; align-items: center; gap: 8px;
+  background: #12162e;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
+#engine-badge { margin-left: auto; font-size: 10px; color: var(--muted); font-weight: 500; }
+
+#messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+.msg.ai { background: #1c2246; align-self: flex-start; border-bottom-left-radius: 3px; }
+.msg.me { background: #34407e; align-self: flex-end; border-bottom-right-radius: 3px; }
+.msg.sys { align-self: center; background: transparent; color: var(--muted); font-size: 12px; font-style: italic; max-width: 100%; text-align: center; }
+.msg.ai .cursor { animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+#chat-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #2a3160; }
+#chat-input { flex: 1; background: #10142c; border: 1px solid #2a3160; color: var(--ink); border-radius: 8px; padding: 9px 12px; font-family: inherit; }
+#chat-input:focus { outline: 1px solid var(--accent); }
+#chat-form button { background: var(--accent); color: #201700; }
+
+/* files panel */
+#file-list { list-style: none; margin: 0; padding: 6px; display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid #2a3160; }
+#file-list li { font-family: monospace; font-size: 12px; padding: 4px 8px; background: #12162e; border: 1px solid #2a3160; border-radius: 6px; cursor: pointer; }
+#file-list li.active { border-color: var(--accent); color: var(--accent); }
+#file-list li.dirty { animation: flash .6s ease; }
+@keyframes flash { 0%,100% { background: #12162e; } 50% { background: var(--haunt); } }
+#file-view { flex: 1; margin: 0; padding: 14px; overflow: auto; font-family: monospace; font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; color: #cdd4ff; }
+#file-view .ins { background: rgba(74,222,128,.18); }
+
+/* ---------- HAUNTED STATE ---------- */
+#screen.haunted #topbar h1 { color: var(--haunt); text-shadow: 0 0 12px var(--haunt); }
+#screen.haunted #game { border-color: var(--haunt); }
+#screen.glitch { animation: glitch .18s steps(2) 6; }
+@keyframes glitch {
+  0% { transform: translate(0,0); filter: hue-rotate(0); }
+  25% { transform: translate(-3px,2px); filter: hue-rotate(90deg); }
+  50% { transform: translate(3px,-2px) skewX(1deg); filter: invert(.15); }
+  75% { transform: translate(-2px,-1px); filter: hue-rotate(-60deg); }
+  100% { transform: translate(0,0); filter: none; }
+}
+#screen.dim { filter: brightness(.7) saturate(1.3); }
+
+@media (max-width: 720px) {
+  #companion { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  #chat { border-right: none; border-bottom: 1px solid #2a3160; }
+}
