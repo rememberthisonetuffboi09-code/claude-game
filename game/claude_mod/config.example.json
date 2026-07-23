@@ -1,0 +1,21 @@
+{
+  "_comment": "Copy this file to config.json and fill in your API key. config.json is git-ignored. Set a spend cap on the key and rotate/delete it after the prank.",
+
+  "api_key": "sk-ant-PUT-YOUR-KEY-HERE",
+
+  "model": "claude-fable-5",
+  "fallback_model": "claude-opus-4-8",
+  "effort": "low",
+  "max_tokens": 1024,
+  "request_timeout_seconds": 90,
+
+  "default_mode": "story",
+  "pace": "normal",
+  "starting_intensity": 1,
+
+  "enable_local_scan": true,
+  "enable_harmless_writes": false,
+
+  "hotkey_escalate": "K_MINUS",
+  "hotkey_deescalate": "K_EQUALS"
+}
