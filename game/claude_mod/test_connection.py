@@ -2,12 +2,11 @@
 """
 test_connection.py — verify your OpenRouter key + model WITHOUT launching the game.
 
-Run:  python game/claude_mod/test_connection.py
+Run:  python test_connection.py   (from inside the claude_mod folder)
 
-It loads config.json, builds the director's system prompt, and makes ONE real
-call to OpenRouter. On success you'll see Monika's opening line. On failure
-(bad key, no credit, unknown model) you'll get a clear message here instead of a
-silent game.
+Loads your config, builds the real director prompt, and makes ONE call to
+OpenRouter. On success you'll see the club's opening line. On failure (bad key,
+no credit, unknown model) you get a clear message here instead of a silent game.
 """
 
 import os
@@ -20,11 +19,18 @@ from claude_mod import load_config, Director  # noqa: E402
 from claude_mod.openrouter_client import LLMError  # noqa: E402
 
 
+def _cleanup(d):
+    try:
+        os.remove(d.memory.path)
+    except OSError:
+        pass
+
+
 def main():
     config = load_config()
     key = config.get("api_key", "")
     if not key or "PUT-YOUR" in key:
-        print("[!] No API key set. Copy config.example.json to config.json and add your OpenRouter key.")
+        print("[!] No API key set. Put your key in config.json (or config.example.json).")
         return 1
 
     print("[*] Provider: OpenRouter")
@@ -32,38 +38,35 @@ def main():
           % (config.get("model"), config.get("fallback_model") or "none"))
     print("[*] Mode: %s   Pace: %s   Scan: %s\n"
           % (config.get("default_mode"), config.get("pace"), config.get("enable_local_scan")))
-    print("[*] Asking Monika to say hello...\n")
+    print("[*] Asking the club to open the scene...\n")
 
-    director = Director(config, session_name="__connection_test__")
-    system = director._build_system_prompt()
-    seed = [{"role": "user", "content": "(The player sits down at the club for the first time.)"}]
+    d = Director(config, session_name="__connection_test__")
+    d.memory.add_player("(The player sits down at the club for the first time.)")
+    system = d._system_prompt()
+    messages = d._messages()
 
     try:
-        result = director.client.complete(system, seed)
+        result = d.client.complete(system, messages)
     except LLMError as e:
         print("[!] Call failed:\n    %s" % e)
-        print("\n    Tip: if it's a credit error, either add funds or set \"model\" to a")
-        print("    \":free\" model in config.json (e.g. deepseek/deepseek-chat-v3-0324:free).")
+        print("\n    - credit error   -> add funds on OpenRouter (or use a \":free\" model)")
+        print("    - model-not-found -> check the slug at https://openrouter.ai/models")
+        _cleanup(d)
         return 1
 
     if not result.text:
-        print("[!] Empty reply. error=%r finish=%r" % (result.error, result.finish_reason))
+        print("[!] Empty reply. finish=%r error=%r" % (result.finish_reason, result.error))
+        _cleanup(d)
         return 1
 
-    turn = director._parse(result.text, result)
-    print("  served by:  %s" % result.model)
-    print("  speaker:    %s   expression: %s" % (turn.speaker, turn.expression))
-    print("  music: %s   background: %s   effect: %s   action: %s"
-          % (turn.music, turn.background, turn.effect, turn.action))
-    print("\n  %s says:\n  \"%s\"\n" % (turn.speaker.capitalize(), turn.text))
-
-    # Clean up the throwaway test transcript.
-    try:
-        os.remove(director.memory.path)
-    except OSError:
-        pass
-
-    print("[✓] Connection works.")
+    beat = d._parse(result)
+    print("  served by: %s   crack: %s" % (result.model, beat.crack))
+    print("  cues: music=%s  bg=%s  effect=%s  action=%s\n"
+          % (beat.music, beat.background, beat.effect, beat.action))
+    for line in beat.turns:
+        print("  %s: %s" % (line.speaker.capitalize(), line.text))
+    print("\n[OK] Connection works.")
+    _cleanup(d)
     return 0
 
 
