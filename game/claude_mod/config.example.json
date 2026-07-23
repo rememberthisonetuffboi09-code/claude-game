@@ -5,9 +5,9 @@
   "api_key": "sk-or-v1-PUT-YOUR-OPENROUTER-KEY-HERE",
   "base_url": "https://openrouter.ai/api/v1/chat/completions",
 
-  "_model_help": "Pick from https://openrouter.ai/models . For the real prank, a Claude model gives the best DDLC roleplay. To TEST at $0 balance, use a ':free' model (see _free_options).",
-  "model": "anthropic/claude-3.7-sonnet",
-  "fallback_model": "anthropic/claude-3.5-sonnet",
+  "_model_help": "Pick from https://openrouter.ai/models . For the real prank, a Claude model gives the best DDLC roleplay. Sonnet 5 is the current best-and-cheapest. To TEST at $0 balance, use a ':free' model (see _free_options). Note: older slugs like anthropic/claude-3.7-sonnet are no longer served ('No endpoints found').",
+  "model": "anthropic/claude-sonnet-5",
+  "fallback_model": "anthropic/claude-sonnet-4.6",
   "_free_options": ["deepseek/deepseek-chat-v3-0324:free", "meta-llama/llama-3.3-70b-instruct:free", "openrouter/auto"],
 
   "temperature": 0.9,
