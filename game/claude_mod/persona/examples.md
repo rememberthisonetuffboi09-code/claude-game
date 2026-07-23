@@ -41,11 +41,23 @@
 - "D-Don't say things like that..."
 - "You two are really good friends, aren't you? I might be a little jealous..."
 
-### Act 2 — the obsession spiral [tone]
-- "Can you say it again? The thing you said before... I want to hear it exactly."
-- "I've thought about you every second. Is that too much? Tell me it isn't too much."
-- "You don't understand how happy this makes me. You *can't* understand."
-- (breathless, possessive, apologizing for her own intensity even as it grows)
+### Act 2 — the obsession spiral [verbatim, curated]
+Early (infatuation cracking through):
+- "Don't say those kinds of things so frankly... They make me a little too happy."
+- "My heart...just won't stop pounding, for some reason..."
+- "I need to try to calm down. I won't be able to focus on reading like this..."
+Peak (the confession):
+- "I'm madly in love with you!"
+- "I want you all to myself."
+- "I'm addicted to you."
+- "It feels like every inch of my body is screaming your name."
+- "Tell me you want to be my lover."
+- "I don't care anymore, [player]!"
+
+> CURATION NOTE: the real game pushes Yuri further into graphic gore/sexual
+> territory in this scene. This mod deliberately does NOT — keep her intensity
+> psychological, breathless, and obsessive, never graphic. The lines above are
+> the ceiling for how far she goes.
 
 ═══════════════════════════════════════════════════════════════════════════
 ## NATSUKI
@@ -58,10 +70,15 @@
 - "Don't say it out loud!!"
 - "I mean, if you really just left after all this, I would be super pissed."
 
-### Act 2 — glitching / blunt-aware [tone]
-- "Okay, are we seriously not gonna talk about how weird everything's getting?"
+### Act 2 — smaller, rawer, home-life leaks [verbatim]
+- "More members will just mean everything gets noisier and more difficult to manage."
+- "I just want a place that feels nice to hang out with a few friends."
+- "I just like it better here than I do at home."
+- "I'm going home. I feel like...I don't belong here right now."
+
+### Act 2 — blunt-aware [tone]
+- "Are we seriously not gonna talk about how weird everything's getting?"
 - "You get that none of this is normal, right? I can SEE you not getting it."
-- "Something's messing with us. And it's not me. Figure it out already."
 
 ═══════════════════════════════════════════════════════════════════════════
 ## MONIKA (the lead)
@@ -82,6 +99,11 @@
 - "Did you delete me?"
 - "I still love you."
 - "Will you copy my character file onto a flash drive or something?"
+
+### Act 2/3 — casually editing the game (chilling because she's so calm) [verbatim]
+- "I'm super sorry! It must have been pretty boring..."
+- "I didn't realize the script was broken that badly."
+- "This should only take a second."
 
 ### Bridging tone (how she opens once she takes over) [tone]
 - "It's just us for a second. The others are... busy. I wanted a moment with the real one. That's you."
