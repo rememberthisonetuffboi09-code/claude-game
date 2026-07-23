@@ -53,7 +53,7 @@ DDLC "HD mod" approach.
 ```
 game/
   claude_mod/                 # the brains (pure Python, engine-agnostic)
-    fable_client.py           # talks to the Anthropic API (Fable 5 + Opus 4.8 fallback)
+    openrouter_client.py      # talks to OpenRouter (Fable 5 + Opus 4.8 fallback, prompt caching)
     director.py               # pacing/escalation, modes, prompt-building, response parsing
     memory.py                 # remembers the whole conversation (survives restarts)
     scanner.py                # SAFE, read-only local signals + dossier loader

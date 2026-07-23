@@ -187,18 +187,27 @@ label claude_mod_takeover:
         jump claude_loop
 
 
-# Render one DokiTurn: background + music + sprite + effect + line + safe effect.
+# Render one Beat: background + music + effect, then each line in turn (one
+# click each), then the safe file effect. A beat is 1..4 lines, so the girls
+# can talk to each other inside a single API call.
 label claude_render(turn):
     if turn is None:
         "..."
         return
     python:
-        claude_apply_background(turn.background)
-        claude_apply_music(turn.music)
-        claude_show(turn.speaker, turn.expression)
-        claude_apply_effect(turn.effect)
-        store.claude_director.perform_action(turn)   # safe file effects only
-    # Show the line. TODO: route through the correct DDLC character `say` so the
-    # right name/box style shows for each speaker.
-    "[turn.text]"
+        _beat = turn
+        claude_apply_background(_beat.background)
+        claude_apply_music(_beat.music)
+        claude_apply_effect(_beat.effect)
+
+        for _line in _beat.turns:
+            claude_show(_line.speaker, _line.expression)
+            # TODO: route through the correct DDLC character `say` so the right
+            # name/box style shows per speaker — with renpy.say() that is now a
+            # one-liner: renpy.say(claude_character_for(_line.speaker), _line.text)
+            renpy.say(None, _line.text)
+
+        # Fires after the whole beat so drop_note sees every line. Each action
+        # type is once-per-session; the director enforces that.
+        store.claude_director.perform_action(_beat)
     return
