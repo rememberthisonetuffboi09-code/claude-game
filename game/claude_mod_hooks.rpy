@@ -1,21 +1,28 @@
 # claude_mod_hooks.rpy
 # ─────────────────────────────────────────────────────────────────────────
-# Ren'Py glue between base DDLC and the Fable 5 "director brain".
+# Ren'Py glue between base DDLC and the OpenRouter "director brain".
 #
 # WHAT THIS FILE DOES
 #   * boots the director brain (game/claude_mod, pure Python)
-#   * provides the label `claude_mod_takeover` that runs the AI dialogue loop
+#   * provides label `claude_mod_takeover` — the AI dialogue loop
 #   * runs API calls on a background thread so the game never freezes
+#   * applies the director's STAGE DIRECTIONS each turn: character + expression,
+#     MUSIC, BACKGROUND, and screen EFFECT
 #   * binds the secret hotkeys:  -  = escalate   |   =  = de-escalate
 #
 # HOW TO WIRE IT INTO DDLC (the "seam")
 #   The authentic game plays untouched through Act 1 up to the day-2 poem/path
-#   choice. At THAT point, hand off to us. In DDLC's day-2 script, right after
+#   choice. At THAT point, hand off to us — in DDLC's day-2 script, right after
 #   the poem/path selection, add:
 #
 #       jump claude_mod_takeover
 #
 #   >>> TODO: confirm the exact label/line in your local DDLC script. <<<
+#
+# SYMBOLIC -> REAL ASSET MAPS
+#   The model emits symbolic cues (music "creepy", background "hallway"); the
+#   maps below turn those into your real DDLC/DDLC+ asset tags. Seeded with the
+#   real base-DDLC names from the script; fill the TODOs with your HD assets.
 # ─────────────────────────────────────────────────────────────────────────
 
 init python:
@@ -23,14 +30,12 @@ init python:
     import sys
     import threading
 
-    # Make the pure-Python package importable from Ren'Py's game/ folder.
     _CLAUDE_ROOT = os.path.join(renpy.config.gamedir)
     if _CLAUDE_ROOT not in sys.path:
         sys.path.insert(0, _CLAUDE_ROOT)
 
     import claude_mod
 
-    # One director per playthrough. Persisted to the store so hotkeys can reach it.
     def claude_boot(session_name="playthrough1"):
         try:
             store.claude_director = claude_mod.make_director(session_name)
@@ -40,7 +45,7 @@ init python:
             store.claude_ready = False
             store.claude_boot_error = str(e)
 
-    # ── background API call (so the UI thread stays responsive) ────────────
+    # ── background API call (keeps the UI thread responsive) ───────────────
     def _bg_respond(holder, director, text):
         try:
             holder["turn"] = director.respond(text)
@@ -48,7 +53,6 @@ init python:
             holder["error"] = str(e)
 
     def claude_respond(director, text):
-        """Call the model off-thread; show a 'typing' beat; return a DokiTurn."""
         holder = {}
         t = threading.Thread(target=_bg_respond, args=(holder, director, text))
         t.start()
@@ -67,22 +71,78 @@ init python:
         if getattr(store, "claude_director", None):
             store.claude_director.deescalate(1.0)
 
-    # ── expression -> sprite ───────────────────────────────────────────────
-    # TODO: map moods to your actual DDLC / DDLC+ HD sprite tags. DDLC sprites
-    # are shown like:  show monika 1a   /   show natsuki 2b
-    # This guarded helper won't crash if a tag is missing while you wire assets.
-    def claude_show(speaker, expression):
-        # Placeholder mapping — replace values with real image tags/attributes.
-        mapping = {
-            # "monika": {"neutral": "monika 1a", "knowing": "monika 1e", ...},
-        }
-        tag = mapping.get(speaker, {}).get(expression)
+    # ── symbolic -> real asset maps (EDIT THESE for your assets) ───────────
+    # Backgrounds: these base-DDLC names are REAL (from the script). Swap the
+    # values for your DDLC+ HD backgrounds if the tags differ.
+    CLAUDE_BG = {
+        "clubroom":  "club_day",
+        "classroom": "class_day",
+        "hallway":   "corridor",
+        "home":      "residential_day",
+        "black":     "black",
+        "void":      "black",     # TODO: a proper "Monika's room / void" bg
+        "glitch":    "club_day",  # TODO: a glitched variant
+    }
+    # Music: 't3' is a real DDLC track name from the script. The emotional
+    # mapping below is a guess — verify against your soundtrack and edit.
+    CLAUDE_MUSIC = {
+        "calm":   "t1",   # TODO verify
+        "happy":  "t1",   # TODO verify
+        "tense":  "t3",
+        "sad":    "t4",   # TODO verify
+        "creepy": "t3",   # TODO: Monika/ominous track
+        "glitch": "t3",   # TODO: glitch/distorted track
+    }
+    # Sprites: DDLC shows sprites like `show monika 1a`. Map each character's
+    # mood word to a real expression tag. Left mostly empty — fill from your
+    # sprite sheet; unknown moods simply leave the current sprite unchanged.
+    CLAUDE_SPRITE = {
+        # "monika":  {"neutral": "1a", "knowing": "1e", "glitch": "..."},
+        # "sayori":  {"happy": "1b", "sad": "1r", ...},
+        # "natsuki": {...},
+        # "yuri":    {...},
+    }
+
+    def claude_apply_background(symbol):
+        if not symbol or symbol == "keep":
+            return
+        tag = CLAUDE_BG.get(symbol)
         if not tag:
-            return  # no sprite change yet — dialogue still shows
+            return
         try:
-            renpy.show(tag)
+            renpy.scene()
+            renpy.show("bg " + tag)
         except Exception:
-            pass  # missing asset shouldn't break the scene
+            pass
+
+    def claude_apply_music(symbol):
+        if not symbol or symbol == "keep":
+            return
+        try:
+            if symbol == "stop":
+                renpy.music.stop(fadeout=2.0)
+                return
+            track = CLAUDE_MUSIC.get(symbol)
+            if track:
+                renpy.music.play(track, loop=True, fadein=1.0)
+        except Exception:
+            pass
+
+    def claude_show(speaker, expression):
+        tag = CLAUDE_SPRITE.get(speaker, {}).get(expression)
+        if not tag:
+            return  # leave current sprite; dialogue still shows
+        try:
+            renpy.show(speaker + " " + tag)
+        except Exception:
+            pass
+
+    def claude_apply_effect(effect):
+        # TODO: wire to DDLC's real glitch/flash transforms. Stubbed so the game
+        # never crashes on an unknown effect.
+        if not effect or effect == "none":
+            return
+        # e.g. renpy.with_statement(vpunch) for "shake", a glitch shader, etc.
 
 
 # Global-while-shown hotkey layer. Shown only during the AI takeover.
@@ -92,17 +152,7 @@ screen claude_hotkeys():
 
 # A quiet "she's typing" indicator during the API round-trip.
 screen claude_typing():
-    # TODO: style this to match DDLC (e.g. the textbox with an animated "...").
-    text "..." align (0.5, 0.9) size 30
-
-# Pick a mode at the start of the takeover.
-screen claude_mode_select():
-    modal True
-    vbox align (0.5, 0.5) spacing 20:
-        text "..." size 40 align (0.5, 0.5)
-        textbutton "Continue" action [SetVariable("claude_mode", "story"), Return("story")]
-        textbutton "..." action [SetVariable("claude_mode", "monika"), Return("monika")]
-    # NOTE: keep this subtle/in-universe; the friend shouldn't clock it as a menu.
+    text "..." align (0.5, 0.9) size 30   # TODO: style to match the DDLC textbox
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -114,19 +164,14 @@ label claude_mod_takeover:
     if not store.claude_ready:
         # Fail visibly to YOU (the setter), not mysteriously to the player.
         "[[setup] Director failed to start: [claude_boot_error!q]"
-        "[[setup] Check game/claude_mod/config.json (API key)."
+        "[[setup] Check game/claude_mod/config.json (OpenRouter key / model)."
         return
 
     show screen claude_hotkeys
 
-    # Mode: use config default, or uncomment to choose at runtime.
-    # call screen claude_mode_select
     python:
         _mode = store.claude_director.config.get("default_mode", "story")
         store.claude_director.set_mode(_mode)
-
-    # Greet a returning player differently ("back so soon?").
-    python:
         _seed = ("(The player returns to the club.)"
                  if store.claude_director.memory.is_returning_player()
                  else "(The player sits with the club after choosing their path.)")
@@ -134,7 +179,6 @@ label claude_mod_takeover:
     $ _turn = claude_respond(store.claude_director, _seed)
     call claude_render(_turn)
 
-    # Main conversational loop.
     label claude_loop:
         python:
             _reply = renpy.input("", length=280) or "..."
@@ -142,14 +186,19 @@ label claude_mod_takeover:
         call claude_render(_turn)
         jump claude_loop
 
-# Render one DokiTurn: sprite + line + any safe effect.
+
+# Render one DokiTurn: background + music + sprite + effect + line + safe effect.
 label claude_render(turn):
     if turn is None:
         "..."
         return
-    $ claude_show(turn.speaker, turn.expression)
-    $ _fx = store.claude_director.perform_action(turn)  # safe effects only
+    python:
+        claude_apply_background(turn.background)
+        claude_apply_music(turn.music)
+        claude_show(turn.speaker, turn.expression)
+        claude_apply_effect(turn.effect)
+        store.claude_director.perform_action(turn)   # safe file effects only
     # Show the line. TODO: route through the correct DDLC character `say` so the
-    # right name/box style shows. For now, narrate generically.
+    # right name/box style shows for each speaker.
     "[turn.text]"
     return

@@ -1,53 +1,64 @@
 #!/usr/bin/env python3
 """
-test_connection.py — verify your API key + model wiring WITHOUT launching the game.
+test_connection.py — verify your OpenRouter key + model WITHOUT launching the game.
 
 Run:  python game/claude_mod/test_connection.py
 
-It loads config.json (or config.example.json), asks the director for a single
-in-character opening line, and prints it. If your key is wrong or the network is
-blocked, you'll see a clear error here instead of a mysterious silent game.
+It loads config.json, builds the director's system prompt, and makes ONE real
+call to OpenRouter. On success you'll see Monika's opening line. On failure
+(bad key, no credit, unknown model) you'll get a clear message here instead of a
+silent game.
 """
 
 import os
 import sys
 
-# Allow running this file directly (adds the parent of claude_mod/ to path).
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(_HERE))
 
 from claude_mod import load_config, Director  # noqa: E402
+from claude_mod.openrouter_client import LLMError  # noqa: E402
 
 
 def main():
     config = load_config()
     key = config.get("api_key", "")
-    if not key or "PUT-YOUR-KEY" in key:
-        print("[!] No API key set. Copy config.example.json to config.json and add your key.")
+    if not key or "PUT-YOUR" in key:
+        print("[!] No API key set. Copy config.example.json to config.json and add your OpenRouter key.")
         return 1
 
-    print("[*] Model:   %s (fallback: %s)" % (
-        config.get("model"), config.get("fallback_model")))
-    print("[*] Effort:  %s   Mode: %s   Pace: %s"
-          % (config.get("effort"), config.get("default_mode"), config.get("pace")))
-    print("[*] Scan on: %s" % config.get("enable_local_scan"))
+    print("[*] Provider: OpenRouter")
+    print("[*] Model:    %s   (fallback: %s)"
+          % (config.get("model"), config.get("fallback_model") or "none"))
+    print("[*] Mode: %s   Pace: %s   Scan: %s\n"
+          % (config.get("default_mode"), config.get("pace"), config.get("enable_local_scan")))
     print("[*] Asking Monika to say hello...\n")
 
     director = Director(config, session_name="__connection_test__")
-    turn = director.respond("(The player sits down at the club for the first time.)")
+    system = director._build_system_prompt()
+    seed = [{"role": "user", "content": "(The player sits down at the club for the first time.)"}]
 
-    if turn.refused:
-        print("[!] The model refused this turn (safety classifier). The Opus 4.8 "
-              "fallback also declined. Try a gentler opening line.")
-    print("  speaker:    %s" % turn.speaker)
-    print("  expression: %s" % turn.expression)
-    print("  action:     %s" % turn.action)
-    print("  served by:  %s" % turn.model)
+    try:
+        result = director.client.complete(system, seed)
+    except LLMError as e:
+        print("[!] Call failed:\n    %s" % e)
+        print("\n    Tip: if it's a credit error, either add funds or set \"model\" to a")
+        print("    \":free\" model in config.json (e.g. deepseek/deepseek-chat-v3-0324:free).")
+        return 1
+
+    if not result.text:
+        print("[!] Empty reply. error=%r finish=%r" % (result.error, result.finish_reason))
+        return 1
+
+    turn = director._parse(result.text, result)
+    print("  served by:  %s" % result.model)
+    print("  speaker:    %s   expression: %s" % (turn.speaker, turn.expression))
+    print("  music: %s   background: %s   effect: %s   action: %s"
+          % (turn.music, turn.background, turn.effect, turn.action))
     print("\n  %s says:\n  \"%s\"\n" % (turn.speaker.capitalize(), turn.text))
 
     # Clean up the throwaway test transcript.
     try:
-        director.memory.reset()
         os.remove(director.memory.path)
     except OSError:
         pass

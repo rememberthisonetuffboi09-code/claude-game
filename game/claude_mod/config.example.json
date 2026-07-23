@@ -1,13 +1,20 @@
 {
-  "_comment": "Copy this file to config.json and fill in your API key. config.json is git-ignored. Set a spend cap on the key and rotate/delete it after the prank.",
+  "_comment": "Copy to config.json (git-ignored) and add your OpenRouter key. Set a per-key spend limit in OpenRouter and rotate the key after the prank.",
+  "_provider": "OpenRouter (OpenAI-compatible). base_url + model IDs are OpenRouter's, not Anthropic's.",
 
-  "api_key": "sk-ant-PUT-YOUR-KEY-HERE",
+  "api_key": "sk-or-v1-PUT-YOUR-OPENROUTER-KEY-HERE",
+  "base_url": "https://openrouter.ai/api/v1/chat/completions",
 
-  "model": "claude-fable-5",
-  "fallback_model": "claude-opus-4-8",
-  "effort": "low",
-  "max_tokens": 1024,
+  "_model_help": "Pick from https://openrouter.ai/models . For the real prank, a Claude model gives the best DDLC roleplay. To TEST at $0 balance, use a ':free' model (see _free_options).",
+  "model": "anthropic/claude-3.7-sonnet",
+  "fallback_model": "anthropic/claude-3.5-sonnet",
+  "_free_options": ["deepseek/deepseek-chat-v3-0324:free", "meta-llama/llama-3.3-70b-instruct:free", "openrouter/auto"],
+
+  "temperature": 0.9,
+  "max_tokens": 800,
   "request_timeout_seconds": 90,
+  "title": "DDLC Director Mod",
+  "referer": "",
 
   "default_mode": "story",
   "pace": "normal",
