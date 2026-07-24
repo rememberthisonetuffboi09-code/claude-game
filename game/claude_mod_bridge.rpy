@@ -60,11 +60,13 @@ init python:
         except Exception:
             pass
 
-    def claude_set_model(slug):
+    def claude_set_model(slug, label=""):
         try:
-            _claude_post("/model", {"model": slug})
+            resp = _claude_post("/model", {"model": slug})
+            got = resp.get("model", slug)
+            renpy.notify("Director model → " + (label or got))
         except Exception:
-            pass
+            renpy.notify("Couldn't switch model — restart sidecar.py?")
 
     # ---- OPTIONAL: auto-seam. Leave "" to use the manual F9 trigger. -------
     # If you want the takeover to fire automatically when DDLC reaches a
@@ -121,20 +123,14 @@ init python:
     # the safe fallback. The map below is BEST-EFFORT: the director sends a mood
     # word, we turn it into a face letter. If a mood shows the wrong face in
     # game, just change its letter here — you can see them live now.
+    # The director now sends ONE of eight fixed mood words. Each maps to a base-
+    # DDLC pose-1 face letter. "a" is confirmed neutral; b-h are best-effort and
+    # easy to correct (see a wrong face in game -> change its letter here). An
+    # invalid letter for a given girl safely falls back to neutral.
     CLAUDE_POSE = "1"
     CLAUDE_MOOD = {
-        "neutral": "a", "normal": "a", "calm": "a", "serious": "a",
-        "knowing": "a", "smug": "a", "sly": "a", "thoughtful": "a", "glitch": "a",
-        "happy": "b", "smile": "b", "pleased": "b", "warm": "b",
-        "content": "b", "amused": "b", "fond": "b",
-        "excited": "c", "laugh": "c", "giggle": "c", "joy": "c",
-        "cheerful": "c", "playful": "c", "teasing": "c",
-        "sad": "d", "hurt": "d", "down": "d", "disappointed": "d", "hopeful": "d",
-        "surprised": "e", "shock": "e", "startled": "e", "confused": "e", "curious": "e",
-        "nervous": "f", "worried": "f", "anxious": "f", "scared": "f",
-        "embarrassed": "f", "shy": "f", "flustered": "f",
-        "angry": "g", "annoyed": "g", "mad": "g", "pout": "g",
-        "irritated": "g", "defensive": "g",
+        "neutral": "a", "happy": "b", "laugh": "c", "sad": "d",
+        "surprised": "e", "nervous": "f", "angry": "g", "knowing": "h",
     }
     # Per-girl overrides (leave {} to use the shared map). A value may be a bare
     # letter ("j") or a full code ("2b"). e.g. "monika": {"knowing": "j"}
@@ -322,6 +318,16 @@ init python:
         for g in draw:
             _claude_show_girl(g, _claude_expr_code(g, stage.get(g)), slot.get(g))
 
+    def claude_clear_girls():
+        # Wipe every girl sprite off the screen, including any left over from
+        # the real game's own scene before the takeover started.
+        store._claude_stage.clear()
+        for g in _CLAUDE_ORDER:
+            try:
+                renpy.hide(g)
+            except Exception:
+                pass
+
     def claude_set_stage(present):
         # present = list of girls the director says are on screen (authoritative),
         # or None to leave the stage unchanged. [] clears everyone.
@@ -329,13 +335,16 @@ init python:
             return
         stage = store._claude_stage
         present = [g for g in present if g in CLAUDE_CHARS]
-        for g in list(stage.keys()):
+        # Hide ANY of the four not present - including native leftovers we never
+        # placed - so the real game's Monika can't linger behind our scene.
+        for g in _CLAUDE_ORDER:
             if g not in present:
+                if g in stage:
+                    del stage[g]
                 try:
                     renpy.hide(g)
                 except Exception:
                     pass
-                del stage[g]
         for g in present:
             if g not in stage:
                 stage[g] = "neutral"
@@ -389,7 +398,7 @@ screen claude_model_menu():
             for _label, _slug in CLAUDE_MODELS:
                 textbutton _label:
                     xfill True
-                    action [Function(claude_set_model, _slug), Hide("claude_model_menu")]
+                    action [Function(claude_set_model, _slug, _label), Hide("claude_model_menu")]
             null height 6
             textbutton "Cancel" xalign 0.5 action Hide("claude_model_menu")
 
@@ -443,6 +452,7 @@ label claude_takeover:
     # Never `return` from this label — once the AI takes over it runs its own
     # loop until the game closes. Connection problems are handled per-turn below.
     $ store._claude_started = True
+    $ claude_clear_girls()   # clear any sprites the real game left on screen
 
     python:
         _pname = _claude_player_name()

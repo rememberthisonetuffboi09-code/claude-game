@@ -56,10 +56,43 @@ _ACTIONS = {"none", "reveal_game", "reveal_file", "drop_note"}
 _CRACKS = ("none", "hairline", "visible", "open", "breach")
 _CRACK_RANK = {name: i for i, name in enumerate(_CRACKS)}
 
-# Max lines in a single beat. Keeps token cost and pacing sane.
-_MAX_LINES = 4
+# Max lines in a single beat. Bigger = livelier back-and-forth between the
+# girls (real conversations aren't one line each).
+_MAX_LINES = 6
 
 _SPEAKERS = {"sayori", "yuri", "natsuki", "monika"}
+
+# A small, fixed expression vocabulary. The Ren'Py bridge maps each of these to
+# a real DDLC face, so keeping the set closed guarantees expressions actually
+# change instead of silently defaulting to neutral. Synonyms fold in.
+_EXPRESSIONS = ("neutral", "happy", "laugh", "sad",
+                "surprised", "nervous", "angry", "knowing")
+_EXPR_SET = set(_EXPRESSIONS)
+_EXPR_SYNONYMS = {
+    "normal": "neutral", "calm": "neutral", "serious": "neutral",
+    "thoughtful": "neutral", "soft": "neutral",
+    "smile": "happy", "pleased": "happy", "warm": "happy", "content": "happy",
+    "fond": "happy", "amused": "happy", "bright": "happy",
+    "excited": "laugh", "giggle": "laugh", "joy": "laugh", "cheerful": "laugh",
+    "playful": "laugh", "teasing": "laugh", "grin": "laugh",
+    "hurt": "sad", "down": "sad", "disappointed": "sad", "hopeful": "sad",
+    "crying": "sad", "melancholy": "sad",
+    "shock": "surprised", "startled": "surprised", "confused": "surprised",
+    "curious": "surprised", "wide-eyed": "surprised",
+    "worried": "nervous", "anxious": "nervous", "scared": "nervous",
+    "embarrassed": "nervous", "shy": "nervous", "flustered": "nervous",
+    "annoyed": "angry", "mad": "angry", "pout": "angry", "irritated": "angry",
+    "defensive": "angry", "huffy": "angry",
+    "smug": "knowing", "sly": "knowing", "wry": "knowing", "deadpan": "knowing",
+    "glitch": "knowing", "sinister": "knowing", "cold": "knowing",
+}
+
+
+def _canon_expr(word):
+    w = (word or "").strip().lower()
+    if w in _EXPR_SET:
+        return w
+    return _EXPR_SYNONYMS.get(w, "neutral")
 
 
 def _band(intensity):
@@ -503,7 +536,7 @@ class Director:
             speaker = str(item.get("speaker", "monika")).lower().strip()
             if speaker not in _SPEAKERS:
                 speaker = "monika"
-            expression = str(item.get("expression", "neutral")).strip() or "neutral"
+            expression = _canon_expr(item.get("expression"))
             turns.append(DokiTurn(speaker, expression, line))
 
         if not turns:
@@ -601,15 +634,22 @@ Use these for rhythm and register, not recitation. Match line LENGTH as closely
 as word choice - real DDLC lines are short. Improvise new lines in these voices;
 never read the examples back verbatim.
 
-# A beat is one or more lines
+# A beat is a real exchange, not one line each
 Each reply is a BEAT: between 1 and {max_lines} spoken lines, in order, which
-the game renders one click at a time. Use more than one line when the girls are
-talking to EACH OTHER - an argument, someone interrupting, a reaction shot.
-- Most beats are 1-2 lines. Reserve 3-4 for real collisions (Natsuki vs Yuri).
-- Never use extra lines to pad, monologue or explain. If one girl says the whole
-  thing, that is a one-line beat and it is correct.
+the game renders one click at a time.
+- AIM FOR 3-6 LINES of the girls actually talking to EACH OTHER. A real club
+  conversation has back-and-forth: someone says something, another reacts, a
+  third chimes in, the first answers. Do NOT stop at one line each and end the
+  scene - that feels dead. Keep the ball moving.
+- A quiet, intimate two-hander can be 1-2 lines; a lively club moment runs
+  longer. Read the room, but default to a fuller exchange over a curt one.
+- Keep each individual LINE short (that's the DDLC voice) - the length comes
+  from MORE lines, never from long rambly ones.
 - Interruption is a real tool: cut a line off with "-" and let another girl
-  finish the thought.
+  finish the thought. Reaction shots, subject changes, someone talking over
+  someone - that texture is what makes it feel alive.
+- Never pad or monologue. Every line earns its place; it just usually takes a
+  few of them to make a scene breathe.
 - The stage directions (music/background/effect/action) apply to the WHOLE beat.
 
 # THE PACING LAW (outranks everything below except the hard rules)
@@ -756,7 +796,7 @@ Rules for this knowledge - it is a scalpel, never a firehose:
 Reply with ONE JSON object and NOTHING else - no commentary, no code fences:
 {{"turns": [
     {{"speaker": "<sayori|yuri|natsuki|monika>",
-     "expression": "<short mood word, e.g. happy, nervous, knowing, glitch>",
+     "expression": "<ONE of: neutral, happy, laugh, sad, surprised, nervous, angry, knowing>",
      "text": "<the spoken line - short, in-voice>"}}
   ],
   "stage": ["<girls on screen this beat, left to right>"],
@@ -766,10 +806,12 @@ Reply with ONE JSON object and NOTHING else - no commentary, no code fences:
   "action": "none",
   "crack": "<none|hairline|visible|open|breach - label this beat honestly>"}}
 Add "poem": {{"author":"<girl>","text":"..."}} ONLY when a poem is being read.
-"turns" holds 1 to {max_lines} lines. "stage" is required every beat. Label
-"crack" honestly; the director audits it and will make you rewrite the beat. If
-your band or the scene state forbids the crack you wanted, write the best
-fully-normal beat instead.
+"turns" holds 1 to {max_lines} lines (aim for 3-6 of real back-and-forth).
+"stage" is required every beat. Give each line an "expression" that matches
+what she's feeling RIGHT THEN - vary it line to line as the mood shifts; a face
+that never changes reads as broken. Label "crack" honestly; the director audits
+it and will make you rewrite the beat. If your band or the scene state forbids
+the crack you wanted, write the best fully-normal beat instead.
 """
 
 

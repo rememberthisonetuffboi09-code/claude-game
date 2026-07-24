@@ -112,6 +112,11 @@ class Handler(BaseHTTPRequestHandler):
                     m = str(data.get("model", "")).strip()
                     if m:
                         d.client.model = m
+                        # Selection is authoritative: drop the auto-fallback so
+                        # the chosen model is what actually runs (not silently
+                        # replaced by the configured fallback).
+                        d.client.fallback_model = ""
+                        print(" [model] switched to %s" % m)
                     self._send(200, {"model": d.client.model})
                 elif self.path == "/reset":
                     d.memory.reset()
