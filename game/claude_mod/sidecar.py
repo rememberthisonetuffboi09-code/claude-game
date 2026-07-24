@@ -35,6 +35,11 @@ from claude_mod.openrouter_client import LLMError  # noqa: E402
 HOST = "127.0.0.1"
 PORT = 8765
 
+# Bump this whenever the sidecar/director changes. The bridge compares it and
+# warns in-game if the running sidecar is older than the bridge expects — so
+# "I updated the .rpy but forgot to update the sidecar" gets caught instantly.
+SIDECAR_VERSION = "6"
+
 _lock = threading.Lock()
 _director = None
 
@@ -88,7 +93,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._send(200, {"ok": True, "model": get_director().client.model})
+            self._send(200, {"ok": True, "version": SIDECAR_VERSION,
+                             "model": get_director().client.model})
         else:
             self._send(404, {"error": "not found"})
 
@@ -136,7 +142,7 @@ def main():
     if "PUT-YOUR" in cfg.get("api_key", ""):
         print("[!] No API key yet. Copy config.example.json to config.json and add your key.")
     print("=" * 58)
-    print(" DDLC director sidecar")
+    print(" DDLC director sidecar   (version %s)" % SIDECAR_VERSION)
     print(" listening: http://%s:%d" % (HOST, PORT))
     print(" model:     %s  (fallback: %s)" % (cfg.get("model"), cfg.get("fallback_model") or "none"))
     print(" Leave this window OPEN while you play. Ctrl+C to stop.")

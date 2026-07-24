@@ -58,7 +58,7 @@ _CRACK_RANK = {name: i for i, name in enumerate(_CRACKS)}
 
 # Max lines in a single beat. Bigger = livelier back-and-forth between the
 # girls (real conversations aren't one line each).
-_MAX_LINES = 6
+_MAX_LINES = 8
 
 _SPEAKERS = {"sayori", "yuri", "natsuki", "monika"}
 
@@ -637,12 +637,15 @@ never read the examples back verbatim.
 # A beat is a real exchange, not one line each
 Each reply is a BEAT: between 1 and {max_lines} spoken lines, in order, which
 the game renders one click at a time.
-- AIM FOR 3-6 LINES of the girls actually talking to EACH OTHER. A real club
+- AIM FOR 4-8 LINES of the girls actually talking to EACH OTHER. A real club
   conversation has back-and-forth: someone says something, another reacts, a
-  third chimes in, the first answers. Do NOT stop at one line each and end the
-  scene - that feels dead. Keep the ball moving.
-- A quiet, intimate two-hander can be 1-2 lines; a lively club moment runs
-  longer. Read the room, but default to a fuller exchange over a curt one.
+  third chimes in, the first answers, someone circles back. Do NOT stop at one
+  line each and end the scene - that feels dead and abrupt. Keep the ball
+  moving; let a topic actually develop before the beat ends.
+- Only a genuinely quiet, intimate two-hander drops to 1-2 lines. Everything
+  else should feel like a scene, not a text message. When unsure, write MORE
+  exchange, not less - the player just typed something and wants the club to
+  come alive, not to send one line and stop.
 - Keep each individual LINE short (that's the DDLC voice) - the length comes
   from MORE lines, never from long rambly ones.
 - Interruption is a real tool: cut a line off with "-" and let another girl

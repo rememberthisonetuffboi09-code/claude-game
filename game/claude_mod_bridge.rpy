@@ -48,6 +48,31 @@ init python:
             resp = resp.decode("utf-8")
         return json.loads(resp)
 
+    def _claude_get(path):
+        req = _claude_url.Request(_CLAUDE_BASE + path)
+        resp = _claude_url.urlopen(req, timeout=10).read()
+        if _claude_py == 3:
+            resp = resp.decode("utf-8")
+        return json.loads(resp)
+
+    # This bridge expects a sidecar at LEAST this new. Bump alongside
+    # SIDECAR_VERSION in sidecar.py. If they don't match, the running sidecar is
+    # stale (you updated the .rpy but not game/claude_mod) — we say so in game.
+    CLAUDE_EXPECTED_SIDECAR = "6"
+
+    def claude_check_sidecar():
+        try:
+            h = _claude_get("/health")
+        except Exception:
+            renpy.notify("Sidecar not reachable - is sidecar.py running?")
+            return
+        v = str(h.get("version", "0"))
+        if v != CLAUDE_EXPECTED_SIDECAR:
+            renpy.notify("OLD SIDECAR (v%s, need v%s): update game/claude_mod "
+                         "and restart sidecar.py" % (v, CLAUDE_EXPECTED_SIDECAR))
+        else:
+            renpy.notify("Sidecar v%s ok - model: %s" % (v, h.get("model", "?")))
+
     def claude_bridge_escalate():
         try:
             _claude_post("/escalate", {"amount": 1})
@@ -453,6 +478,7 @@ label claude_takeover:
     # loop until the game closes. Connection problems are handled per-turn below.
     $ store._claude_started = True
     $ claude_clear_girls()   # clear any sprites the real game left on screen
+    $ claude_check_sidecar() # warn immediately if the sidecar is stale
 
     python:
         _pname = _claude_player_name()
