@@ -135,6 +135,25 @@ init python:
         # unknown effect never crashes the scene.
         pass
 
+    # Route each speaker to DDLC's own Character so the right name box + colour
+    # shows. DDLC defines s / n / y / m for the girls. If that lookup fails
+    # (different build), fall back to a "Name: line" so you can still tell who
+    # is talking. Either way the line always renders.
+    CLAUDE_CHARS = {"sayori": "s", "natsuki": "n", "yuri": "y", "monika": "m"}
+
+    def claude_bridge_say(speaker, text):
+        speaker = (speaker or "").lower()
+        varname = CLAUDE_CHARS.get(speaker)
+        who = getattr(store, varname, None) if varname else None
+        try:
+            if who is not None:
+                renpy.say(who, text)
+                return
+        except Exception:
+            pass
+        name = speaker.capitalize()
+        renpy.say(None, (name + ": " + text) if name else text)
+
 
 default _claude_started = False
 
@@ -153,26 +172,18 @@ init python:
 # THE TAKEOVER LOOP
 # ─────────────────────────────────────────────────────────────────────────
 label claude_takeover:
+    # NOTE: we get here via a Jump (F9), so there is NO call frame to return to.
+    # Never `return` from this label — once the AI takes over it runs its own
+    # loop until the game closes. Connection problems are handled per-turn below.
     $ store._claude_started = True
-
-    # Confirm the sidecar is running (visible to YOU, the setter, not the friend).
-    python:
-        _ok = True
-        try:
-            _claude_post("/mode", {"mode": store.claude_bridge_mode if hasattr(store, "claude_bridge_mode") else "story"})
-        except Exception as _e:
-            _ok = False
-    if not _ok:
-        "[[setup] Can't reach the director. Start it first: run  python sidecar.py"
-        "[[setup] then press F9 again."
-        return
 
     python:
         try:
             _r = _claude_post("/respond",
                               {"text": "(The player is now with the club, just after the path choice.)"})
         except Exception:
-            _r = None
+            _r = {"turns": [{"speaker": "monika", "expression": "neutral",
+                             "text": "...(is sidecar.py running? start it, then keep typing.)"}]}
     call claude_render_beat(_r)
 
     label claude_bridge_loop:
@@ -198,6 +209,5 @@ label claude_render_beat(r):
         claude_bridge_effect(r.get("effect", "none"))
         for _line in r.get("turns", []):
             claude_bridge_sprite(_line.get("speaker"), _line.get("expression"))
-            # TODO: route through the correct DDLC `say` character per speaker.
-            renpy.say(None, _line.get("text", ""))
+            claude_bridge_say(_line.get("speaker"), _line.get("text", ""))
     return
