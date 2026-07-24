@@ -32,17 +32,30 @@ Two pieces:
    (right after the day-2 poem/path choice is the intended spot), press **F9**.
    From then on the club is live.
    - **`-`** = escalate the creep · **`=`** = dial it back (secret, mid-play)
+   - **F10** = model picker (Fable 5 / Opus 4.8 / Opus 4.7 / Sonnet 5 / GLM).
+     Switches the director's model live via the sidecar's `/model` endpoint.
+
+The bridge now handles the visuals itself: each girl gets her own DDLC-styled
+**name box** (colour + quotes), her **sprite appears and repositions** as girls
+join the scene, **music/background** cues map to real base-DDLC tracks
+(`t3`/`t4`/`t8`/`t9`/`g1`/`g2`, `club_day`/`class_day`/…), and `shake`/`flash`
+effects use Ren'Py's built-in `vpunch`/`Fade`. The takeover also reads the
+player's entered name (`persistent.playername`) and hands it to the director so
+Monika can use it.
 
 If F9 says "Can't reach the director," the sidecar window isn't running — start
 step 2 and press F9 again.
 
 ## Making it look right (next tuning passes)
 
-- **Speaker name/box:** the bridge currently narrates lines; to show each girl's
-  real DDLC name box, fill the one `renpy.say()` TODO in `claude_mod_bridge.rpy`.
-- **Sprites:** fill `CLAUDE_SPRITE` in the bridge with your real expression tags
-  (`show monika 1a` style). Backgrounds/music maps are pre-seeded with real
-  base-DDLC names — tweak for your HD assets.
+- **Name boxes / music / backgrounds:** working out of the box (base-DDLC
+  tags). Edit `CLAUDE_NAME_COLORS`, `CLAUDE_MUSIC`, `CLAUDE_BG` at the top of
+  `claude_mod_bridge.rpy` if your HD assets use different names/colours.
+- **Sprite expressions:** `CLAUDE_SPRITE` currently maps only `_default`/`happy`/
+  `surprised` (safe base-DDLC codes); every other mood falls back to a neutral
+  pose so a sprite always shows and nothing crashes. Fill in more per-girl codes
+  (`1a`/`1b`/`2a`… for base DDLC, or your DDLC+ tags) once you've picked which
+  sprite set you're shipping.
 - **Auto-seam (optional):** to make F9 automatic, set `CLAUDE_LOG_LABELS = True`
   in the bridge, play to the day-2 choice, open `claude_labels.log`, find the
   label that fired at that moment, and put it in `CLAUDE_SEAM_LABEL`.

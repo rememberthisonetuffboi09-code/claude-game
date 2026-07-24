@@ -106,6 +106,11 @@ class Handler(BaseHTTPRequestHandler):
                 elif self.path == "/mode":
                     d.set_mode(str(data.get("mode", "")))
                     self._send(200, {"mode": d.mode})
+                elif self.path == "/model":
+                    m = str(data.get("model", "")).strip()
+                    if m:
+                        d.client.model = m
+                    self._send(200, {"model": d.client.model})
                 elif self.path == "/reset":
                     d.memory.reset()
                     globals()["_director"] = None
