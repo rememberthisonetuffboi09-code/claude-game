@@ -106,6 +106,7 @@ class Beat:
 
     def __init__(self, turns=None, music="keep", background="keep",
                  effect="none", action="none", crack="none",
+                 stage=None, poem=None,
                  raw="", model="", refused=False):
         self.turns = turns or [DokiTurn()]
         self.music = music
@@ -113,6 +114,8 @@ class Beat:
         self.effect = effect
         self.action = action
         self.crack = crack
+        self.stage = stage      # list of girls on screen this beat, or None
+        self.poem = poem        # {"author","text"} to show full-screen, or None
         self.raw = raw          # raw assistant text (stored to memory verbatim)
         self.model = model
         self.refused = refused
@@ -513,12 +516,41 @@ class Director:
             effect=_pick(obj.get("effect"), _EFFECT, "none"),
             action=_pick(obj.get("action"), _ACTIONS, "none"),
             crack=_pick(obj.get("crack"), set(_CRACKS), "none"),
+            stage=_parse_stage(obj.get("stage")),
+            poem=_parse_poem(obj.get("poem")),
             raw=text, model=result.model, refused=result.refused)
 
 
 def _pick(value, allowed, default):
     v = str(value).strip().lower() if value is not None else ""
     return v if v in allowed else default
+
+
+def _parse_stage(value):
+    """Who is on screen this beat. A list of girl names -> cleaned list; None
+    (missing) means 'leave the stage as it was'. [] means 'nobody visible'."""
+    if not isinstance(value, list):
+        return None
+    seen, out = set(), []
+    for item in value:
+        g = str(item).strip().lower()
+        if g in _SPEAKERS and g not in seen:
+            seen.add(g)
+            out.append(g)
+    return out
+
+
+def _parse_poem(value):
+    """A poem to render full-screen, or None."""
+    if not isinstance(value, dict):
+        return None
+    text = str(value.get("text", "")).strip()
+    if not text:
+        return None
+    author = str(value.get("author", "monika")).strip().lower()
+    if author not in _SPEAKERS:
+        author = "monika"
+    return {"author": author, "text": text}
 
 
 def _extract_json(text):
@@ -668,6 +700,25 @@ Cue economy - a change is an EVENT, so default to keep/keep/none/none:
   intensity 8+, at a peak, ONCE each per session, ever.
 One well-placed flash in hour two is worth more than every effect fired hourly.
 
+# Who is on screen (stage) and poems
+- stage: the list of girls physically present in THIS scene, left to right,
+  e.g. ["natsuki","yuri","monika"]. INCLUDE IT ON EVERY BEAT - it is how the
+  game knows who to show and where. When a girl enters or leaves, change the
+  list and the game adds/removes her sprite to match. Anyone speaking this beat
+  must be in stage. An empty list [] means no girls are visible (the player is
+  alone, or someone just walked out). Keep the cast realistic: the four aren't
+  always all together - girls step away to get tea, dig through the closet,
+  talk in the hall. Two- and three-girl scenes are the norm; all four at once
+  is an event.
+- poem: ONLY when a poem should be read full-screen, exactly like the real
+  game - the player opens someone's poem, or a girl shares hers. Set
+  {{"author":"<girl>","text":"<the poem>"}}. Write the poem in HER real voice:
+  Sayori simple and bright with a hidden ache; Natsuki short, cute, a defensive
+  edge; Yuri dense and lush and a little too intense; Monika clean, clever, one
+  step outside the frame. Keep it a short free-verse poem, like DDLC's - a
+  handful of lines, real line breaks (\\n). Omit poem entirely when none is
+  being read. A poem's creepiness obeys the same pacing law as everything else.
+
 # What you secretly know about THIS player (the scalpel)
 {knows}
 Rules for this knowledge - it is a scalpel, never a firehose:
@@ -708,14 +759,17 @@ Reply with ONE JSON object and NOTHING else - no commentary, no code fences:
      "expression": "<short mood word, e.g. happy, nervous, knowing, glitch>",
      "text": "<the spoken line - short, in-voice>"}}
   ],
+  "stage": ["<girls on screen this beat, left to right>"],
   "music": "keep",
   "background": "keep",
   "effect": "none",
   "action": "none",
   "crack": "<none|hairline|visible|open|breach - label this beat honestly>"}}
-"turns" holds 1 to {max_lines} lines. Label "crack" honestly; the director
-audits it and will make you rewrite the beat. If your band or the scene state
-forbids the crack you wanted, write the best fully-normal beat instead.
+Add "poem": {{"author":"<girl>","text":"..."}} ONLY when a poem is being read.
+"turns" holds 1 to {max_lines} lines. "stage" is required every beat. Label
+"crack" honestly; the director audits it and will make you rewrite the beat. If
+your band or the scene state forbids the crack you wanted, write the best
+fully-normal beat instead.
 """
 
 

@@ -55,6 +55,8 @@ def beat_to_dict(beat):
         "effect": beat.effect,
         "action": beat.action,
         "crack": beat.crack,
+        "stage": beat.stage,        # list of girls on screen, or null
+        "poem": beat.poem,          # {"author","text"} or null
         "model": beat.model,
     }
 

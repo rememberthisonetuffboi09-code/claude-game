@@ -106,8 +106,7 @@ init python:
         "calm": "t4", "happy": "t3", "tense": "t9", "sad": "t8",
         "creepy": "g2", "glitch": "g1",
     }
-    # Which DDLC dialogue Character each speaker maps to (used only as a hint;
-    # we render nameboxes ourselves below so the name ALWAYS shows).
+    # The four girls the bridge knows about.
     CLAUDE_CHARS = {"sayori": "s", "natsuki": "n", "yuri": "y", "monika": "m"}
 
     # DDLC-style name colours for the namebox (approximate — edit to taste).
@@ -116,15 +115,36 @@ init python:
         "yuri": "#b18bd6", "monika": "#5eba7d",
     }
 
-    # Sprite expression codes. Base DDLC uses `show <girl> 1a`, `1b`, `2a`...
-    # "_default" is what shows when a mood isn't mapped, so a sprite ALWAYS
-    # appears and nothing ever crashes. Fill in more codes once you've picked
-    # base vs. DDLC+ sprites (the letters can differ per girl).
-    CLAUDE_SPRITE = {
-        "sayori":  {"_default": "1a", "happy": "1b", "surprised": "1c"},
-        "natsuki": {"_default": "1a", "happy": "1b", "surprised": "1c"},
-        "yuri":    {"_default": "1a", "happy": "1b", "surprised": "1c"},
-        "monika":  {"_default": "1a", "happy": "1b", "surprised": "1c"},
+    # ── sprite expression codes ────────────────────────────────────────────
+    # Base DDLC sprites are `show <girl> 1a`..`1r` (pose 1 + a face letter; the
+    # composite is 960x960). "a" is the neutral face and always exists, so it's
+    # the safe fallback. The map below is BEST-EFFORT: the director sends a mood
+    # word, we turn it into a face letter. If a mood shows the wrong face in
+    # game, just change its letter here — you can see them live now.
+    CLAUDE_POSE = "1"
+    CLAUDE_MOOD = {
+        "neutral": "a", "normal": "a", "calm": "a", "serious": "a",
+        "knowing": "a", "smug": "a", "sly": "a", "thoughtful": "a", "glitch": "a",
+        "happy": "b", "smile": "b", "pleased": "b", "warm": "b",
+        "content": "b", "amused": "b", "fond": "b",
+        "excited": "c", "laugh": "c", "giggle": "c", "joy": "c",
+        "cheerful": "c", "playful": "c", "teasing": "c",
+        "sad": "d", "hurt": "d", "down": "d", "disappointed": "d", "hopeful": "d",
+        "surprised": "e", "shock": "e", "startled": "e", "confused": "e", "curious": "e",
+        "nervous": "f", "worried": "f", "anxious": "f", "scared": "f",
+        "embarrassed": "f", "shy": "f", "flustered": "f",
+        "angry": "g", "annoyed": "g", "mad": "g", "pout": "g",
+        "irritated": "g", "defensive": "g",
+    }
+    # Per-girl overrides (leave {} to use the shared map). A value may be a bare
+    # letter ("j") or a full code ("2b"). e.g. "monika": {"knowing": "j"}
+    CLAUDE_SPRITE = {"sayori": {}, "natsuki": {}, "yuri": {}, "monika": {}}
+
+    # Optional per-girl poem/handwriting fonts (DDLC .ttf filenames in game/).
+    # Leave empty to render the poem in the default font on the notebook paper.
+    CLAUDE_POEM_FONTS = {
+        # "sayori": "sayori.ttf", "natsuki": "natsuki.ttf",
+        # "yuri": "yuri.ttf", "monika": "monika.ttf",
     }
 
     # Model picker presets (label, OpenRouter slug). Edit freely.
@@ -137,8 +157,6 @@ init python:
     ]
 
     # ── nameboxes: our own DDLC-styled Characters (deterministic) ──────────
-    # We build a Character per girl with quotes + her colour, so the name box
-    # ALWAYS renders through DDLC's own say screen. Cached after first use.
     _CLAUDE_SAY_CACHE = {}
 
     def _claude_char_for(speaker):
@@ -167,10 +185,9 @@ init python:
                     return
                 except Exception:
                     pass
-        # Unknown speaker / narration: no name box.
-        renpy.say(None, text)
+        renpy.say(None, text)   # unknown speaker / narration: no name box
 
-    # ── the player's real entered name (base DDLC stores it here) ──────────
+    # ── the player's real entered name + a Character for their own lines ────
     def _claude_player_name():
         n = None
         try:
@@ -183,6 +200,28 @@ init python:
             except Exception:
                 n = None
         return n or ""
+
+    _CLAUDE_PLAYER_CHAR = []
+
+    def _claude_player_char():
+        if not _CLAUDE_PLAYER_CHAR:
+            nm = _claude_player_name() or "You"
+            try:
+                _CLAUDE_PLAYER_CHAR.append(Character(nm, who_color="#ffe6f0"))
+            except Exception:
+                _CLAUDE_PLAYER_CHAR.append(None)
+        return _CLAUDE_PLAYER_CHAR[0]
+
+    def claude_show_player_line(text):
+        # Echo what the player typed as their own dialogue line, so it shows on
+        # screen AND lands in the game's built-in History (the 'h' screen).
+        text = (text or "").strip()
+        if not text or text == "...":
+            return
+        try:
+            renpy.say(_claude_player_char(), text)
+        except Exception:
+            pass
 
     # ── background / music / effects ───────────────────────────────────────
     def claude_bridge_bg(symbol):
@@ -208,8 +247,7 @@ init python:
             track = CLAUDE_MUSIC.get(symbol)
             if not track:
                 return
-            # Resolve audio.t3 -> its filename+loop string when possible.
-            src = getattr(store.audio, track, track)
+            src = getattr(store.audio, track, track)   # resolve audio.t3 -> file
             renpy.music.play(src, loop=True, fadein=1.0)
         except Exception:
             pass
@@ -220,55 +258,106 @@ init python:
                 renpy.with_statement(vpunch)
             elif effect == "flash":
                 renpy.with_statement(Fade(0.1, 0.0, 0.4, color="#ffffff"))
-            # "glitch" is left as a safe no-op; wire to DDLC's real glitch
-            # transform later if you want it.
+            # "glitch" left as a safe no-op; wire to DDLC's glitch transform later
         except Exception:
             pass
 
-    # ── sprites: who's on stage, where, and with what face ─────────────────
+    # ── sprites: who's on stage, where, at what size, with what face ───────
     _CLAUDE_ORDER = ["sayori", "natsuki", "yuri", "monika"]
 
     def _claude_positions(n):
+        # (xalign, zoom) per slot. Base DDLC sprites are 960x960 in a 720-tall
+        # window, so they MUST be zoomed down or heads get cut. Fewer girls =
+        # bigger; more girls = smaller and spread wider.
         if n <= 1:
-            xs = [0.5]
+            layout = [(0.50, 0.70)]
         elif n == 2:
-            xs = [0.30, 0.70]
+            layout = [(0.30, 0.64), (0.70, 0.64)]
         elif n == 3:
-            xs = [0.20, 0.50, 0.80]
+            layout = [(0.20, 0.58), (0.50, 0.58), (0.80, 0.58)]
         else:
-            xs = [0.15, 0.38, 0.62, 0.85]
-        try:
-            return [Transform(xalign=x, yalign=1.0) for x in xs]
-        except Exception:
-            return [None] * len(xs)
+            layout = [(0.14, 0.52), (0.37, 0.52), (0.63, 0.52), (0.86, 0.52)]
+        out = []
+        for x, z in layout:
+            try:
+                out.append(Transform(xalign=x, yalign=1.0, zoom=z))
+            except Exception:
+                out.append(None)
+        return out
 
     def _claude_expr_code(speaker, expression):
-        m = CLAUDE_SPRITE.get(speaker, {})
-        code = m.get((expression or "").lower())
-        return code or m.get("_default") or "1a"
+        exp = (expression or "").lower().strip()
+        letter = CLAUDE_SPRITE.get(speaker, {}).get(exp) or CLAUDE_MOOD.get(exp) or "a"
+        if letter[:1].isdigit():      # a full code override like "2b"
+            return letter
+        return CLAUDE_POSE + letter
+
+    def _claude_show_girl(g, code, pos):
+        try:
+            if pos is not None:
+                renpy.show(g + " " + code, at_list=[pos])
+            else:
+                renpy.show(g + " " + code)
+            return
+        except Exception:
+            pass
+        try:                          # fall back to the always-valid neutral face
+            if pos is not None:
+                renpy.show(g + " 1a", at_list=[pos])
+            else:
+                renpy.show(g + " 1a")
+        except Exception:
+            pass
 
     def _claude_render_stage(front=None):
         stage = store._claude_stage
         order = [g for g in _CLAUDE_ORDER if g in stage]
-        if front in order:                       # draw the speaker last = on top
-            order = [g for g in order if g != front] + [front]
         pos = _claude_positions(len(order))
+        slot = {}
         for i, g in enumerate(order):
-            code = _claude_expr_code(g, stage.get(g))
-            try:
-                if pos[i] is not None:
-                    renpy.show(g + " " + code, at_list=[pos[i]])
-                else:
-                    renpy.show(g + " " + code)
-            except Exception:
-                pass
+            slot[g] = pos[i]
+        draw = order[:]               # draw the speaker LAST so she's on top
+        if front in draw:
+            draw = [g for g in draw if g != front] + [front]
+        for g in draw:
+            _claude_show_girl(g, _claude_expr_code(g, stage.get(g)), slot.get(g))
+
+    def claude_set_stage(present):
+        # present = list of girls the director says are on screen (authoritative),
+        # or None to leave the stage unchanged. [] clears everyone.
+        if present is None:
+            return
+        stage = store._claude_stage
+        present = [g for g in present if g in CLAUDE_CHARS]
+        for g in list(stage.keys()):
+            if g not in present:
+                try:
+                    renpy.hide(g)
+                except Exception:
+                    pass
+                del stage[g]
+        for g in present:
+            if g not in stage:
+                stage[g] = "neutral"
+        _claude_render_stage()
 
     def claude_stage_update(speaker, expression):
         speaker = (speaker or "").lower()
         if speaker not in CLAUDE_CHARS:
-            return                                # narration: don't touch sprites
-        store._claude_stage[speaker] = expression
+            return                    # narration: don't touch sprites
+        store._claude_stage[speaker] = expression   # adds her if she wasn't listed
         _claude_render_stage(front=speaker)
+
+    # ── poems: render one full-screen on the notebook paper, DDLC-style ────
+    def claude_show_poem(author, text):
+        text = (text or "").strip()
+        if not text:
+            return
+        font = CLAUDE_POEM_FONTS.get((author or "monika").lower())
+        try:
+            renpy.call_screen("claude_poem", text, font)
+        except Exception:
+            pass
 
 
 default _claude_started = False
@@ -305,6 +394,47 @@ screen claude_model_menu():
             textbutton "Cancel" xalign 0.5 action Hide("claude_model_menu")
 
 
+# Where the player types their message. A slim readable strip near the bottom,
+# wide enough not to spill off the textbox.
+screen claude_input(prompt=""):
+    zorder 60
+    frame:
+        xalign 0.5
+        yalign 0.90
+        xsize 1160
+        background "#00000088"
+        padding (26, 14)
+        input:
+            id "input"
+            length 300
+            pixel_width 1100
+            color "#ffffff"
+            size 30
+
+
+# A poem, shown full-screen on DDLC's notebook paper. Click (or Enter/Space)
+# to close it and return to the club.
+screen claude_poem(poem_text, poem_font):
+    modal True
+    zorder 100
+    add "bg notebook"
+    button:
+        xfill True
+        yfill True
+        background None
+        action Return(True)
+    frame:
+        background None
+        align (0.5, 0.42)
+        xsize 900
+        if poem_font:
+            text poem_text font poem_font size 34 color "#3a2a2a" line_spacing 6
+        else:
+            text poem_text size 34 color "#3a2a2a" line_spacing 6
+    key "K_RETURN" action Return(True)
+    key "K_SPACE" action Return(True)
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # THE TAKEOVER LOOP
 # ─────────────────────────────────────────────────────────────────────────
@@ -326,7 +456,12 @@ label claude_takeover:
     call claude_render_beat(_r)
 
     label claude_bridge_loop:
-        $ _reply = renpy.input("", length=280) or "..."
+        python:
+            try:
+                _reply = renpy.input("", screen="claude_input", length=300) or "..."
+            except Exception:
+                _reply = renpy.input("", length=300) or "..."
+        $ claude_show_player_line(_reply)
         python:
             try:
                 _r = _claude_post("/respond", {"text": _reply})
@@ -337,7 +472,7 @@ label claude_takeover:
         jump claude_bridge_loop
 
 
-# Render one beat dict from the sidecar: cues, then each line one click at a time.
+# Render one beat dict from the sidecar: cues, stage, each line, then any poem.
 label claude_render_beat(r):
     if not r:
         "..."
@@ -346,7 +481,11 @@ label claude_render_beat(r):
         claude_bridge_bg(r.get("background", "keep"))
         claude_bridge_music(r.get("music", "keep"))
         claude_bridge_effect(r.get("effect", "none"))
+        claude_set_stage(r.get("stage"))
         for _line in r.get("turns", []):
             claude_stage_update(_line.get("speaker"), _line.get("expression"))
             claude_bridge_say(_line.get("speaker"), _line.get("text", ""))
+        _poem = r.get("poem")
+        if _poem:
+            claude_show_poem(_poem.get("author"), _poem.get("text", ""))
     return
