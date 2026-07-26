@@ -1,0 +1,28 @@
+{
+  "_comment": "Copy to config.json (git-ignored) and add your OpenRouter key. Set a per-key spend limit in OpenRouter and rotate the key after the prank.",
+  "_provider": "OpenRouter (OpenAI-compatible). base_url + model IDs are OpenRouter's, not Anthropic's.",
+  "api_key": "sk-or-v1-PUT-YOUR-OPENROUTER-KEY-HERE",
+  "base_url": "https://openrouter.ai/api/v1/chat/completions",
+  "_model_help": "Pick from https://openrouter.ai/models . anthropic/claude-fable-5 is the strongest for this; anthropic/claude-sonnet-5 is the budget pick. ':free' models work at $0 for testing.",
+  "model": "anthropic/claude-fable-5",
+  "fallback_model": "anthropic/claude-opus-4.8",
+  "_free_options": [
+    "deepseek/deepseek-chat-v3-0324:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "openrouter/auto"
+  ],
+  "temperature": 0.9,
+  "max_tokens": 900,
+  "request_timeout_seconds": 90,
+  "title": "DDLC Director Mod",
+  "referer": "",
+  "default_mode": "story",
+  "pace": "normal",
+  "starting_intensity": 0,
+  "enable_local_scan": true,
+  "enable_harmless_writes": false,
+  "hotkey_escalate": "K_MINUS",
+  "hotkey_deescalate": "K_EQUALS",
+  "enable_prompt_cache": true,
+  "cache_ttl": "5m"
+}

@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────
+# Secrets & personal config — NEVER commit these
+# ─────────────────────────────────────────────────────────────
+game/claude_mod/config.json
+game/claude_mod/dossier.json
+
+# ─────────────────────────────────────────────────────────────
+# Copyrighted game assets (DDLC / DDLC+) — keep LOCAL, never commit.
+# You own DDLC+; ripped art/music/fonts stay on your machine only.
+# ─────────────────────────────────────────────────────────────
+*.rpa
+*.rpyc
+game/claude_mod/hd_assets/
+assets/
+/audio/
+/images/
+/gui/
+/fonts/
+
+# ─────────────────────────────────────────────────────────────
+# Runtime data (conversation transcripts, saves)
+# ─────────────────────────────────────────────────────────────
+game/claude_mod/memory/
+*.save
+saves/
+transcripts/
+
+# ─────────────────────────────────────────────────────────────
+# Python / OS junk
+# ─────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+Thumbs.db

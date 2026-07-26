@@ -1,0 +1,16 @@
+{
+  "_comment": "Copy to dossier.json and fill in what YOU already know about your friend. This is the secret sauce behind 'how does it know that?!'. Leave anything blank you don't have. dossier.json is git-ignored. Only put things you're comfortable with — no passwords, nothing you got without their knowledge.",
+
+  "name": "",
+  "nicknames": [],
+  "pronouns": "",
+  "discord_handle": "",
+  "friends": [],
+  "inside_jokes": [],
+  "hobbies": [],
+  "games_they_love": [],
+  "crush_or_partner": "",
+  "recent_life_stuff": [],
+  "things_theyd_be_spooked_you_know": [],
+  "off_limits": ["Anything genuinely upsetting or private. Keep it fun and consensual."]
+}
