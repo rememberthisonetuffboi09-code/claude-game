@@ -139,7 +139,7 @@ class Beat:
 
     def __init__(self, turns=None, music="keep", background="keep",
                  effect="none", action="none", crack="none",
-                 stage=None, poem=None,
+                 stage=None, poem=None, error=None,
                  raw="", model="", refused=False):
         self.turns = turns or [DokiTurn()]
         self.music = music
@@ -149,6 +149,7 @@ class Beat:
         self.crack = crack
         self.stage = stage      # list of girls on screen this beat, or None
         self.poem = poem        # {"author","text"} to show full-screen, or None
+        self.error = error      # transport/auth/credit problem, for the setter
         self.raw = raw          # raw assistant text (stored to memory verbatim)
         self.model = model
         self.refused = refused
@@ -216,6 +217,8 @@ class Director:
         # things it secretly knows
         self.scan = scanner.safe_scan(enabled=config.get("enable_local_scan", True))
         self.dossier = scanner.load_dossier()
+        # the name the player typed into the real game (Monika uses it)
+        self.player_name = self.memory.meta.get("player_name", "")
 
         # The static prompt never changes during a session, so build it once.
         # (set_mode() invalidates it — see below.)
@@ -237,6 +240,14 @@ class Director:
         if mode in ("story", "monika") and mode != self.mode:
             self.mode = mode
             self._system_cache = None   # mode note lives in the static prompt
+
+    def set_player_name(self, name):
+        """The real name the player typed at the game's name prompt."""
+        name = (name or "").strip()
+        if name and name != self.player_name:
+            self.player_name = name
+            self.memory.meta["player_name"] = name
+            self._system_cache = None   # the name lives in the static prompt
 
     def _drift(self):
         self.intensity = min(10.0, self.intensity + _PACE_DRIFT.get(self.pace, 0.12))
@@ -267,9 +278,10 @@ class Director:
         system = self._system_prompt()
         try:
             result = self.client.complete(system, self._messages())
-        except LLMError:
-            # Never break the illusion on a transient failure.
-            return Beat([DokiTurn("monika", "neutral", "...")])
+        except LLMError as e:
+            # Never break the illusion for the PLAYER — but hand the real reason
+            # up so the setter sees it (a silent "..." forever is unfixable).
+            return Beat([DokiTurn("monika", "neutral", "...")], error=str(e))
 
         beat = self._parse(result)
 
@@ -451,7 +463,9 @@ class Director:
                        "her own pace. She can do more and go further off-script."),
         }.get(self.mode, "")
 
-        knows = {"scanned_machine": self.scan, "dossier": self.dossier}
+        knows = {"player_name": self.player_name or "(unknown)",
+                 "scanned_machine": self.scan,
+                 "dossier": self.dossier}
 
         self._system_cache = _SYSTEM_TEMPLATE.format(
             characters=json.dumps(self.characters, ensure_ascii=False, indent=2),
@@ -764,7 +778,13 @@ One well-placed flash in hour two is worth more than every effect fired hourly.
 
 # What you secretly know about THIS player (the scalpel)
 {knows}
-Rules for this knowledge - it is a scalpel, never a firehose:
+EXCEPTION - "player_name" is NOT secret knowledge. It is the name he typed at
+the game's own name prompt, so the club has always known it. Use it naturally
+and warmly from the very first beat, exactly like the real game does: Monika
+uses it most, the others use it sometimes. Never comment on knowing it.
+
+Rules for the REST of this knowledge (scanned_machine, dossier) - it is a
+scalpel, never a firehose:
 - Below intensity 5: never touch it. 5-6: at most one soft ambient detail (the
   hour, how long he's been playing). 7+: one real cut per band.
 - One detail per use. Folded mid-sentence into an otherwise normal line, as if

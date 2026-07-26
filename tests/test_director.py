@@ -229,6 +229,78 @@ d._persist()
 d_re = Director(d.config, session_name="__test5__")
 check("open_used survives restart", bool(d_re.memory.meta.get("open_used_this_band")))
 
+# ── 7. expressions, stage, poem, errors, player name ──────────────────────
+print("[expressions]")
+check("canonical mood passes through", D._canon_expr("happy") == "happy")
+check("synonym folds to canonical", D._canon_expr("smug") == "knowing")
+check("unknown mood -> neutral", D._canon_expr("banana") == "neutral")
+check("case/space tolerant", D._canon_expr("  ANGRY ") == "angry")
+check("empty -> neutral", D._canon_expr(None) == "neutral")
+check("every canonical mood is distinct", len(set(D._EXPRESSIONS)) == 8)
+check("no synonym shadows a canonical word",
+      not (set(D._EXPR_SYNONYMS) & set(D._EXPRESSIONS)))
+check("all synonyms resolve to canonical moods",
+      all(v in D._EXPR_SET for v in D._EXPR_SYNONYMS.values()))
+
+d = fresh(session="__test6__")
+beat = d._parse(LLMResult(json.dumps({
+    "turns": [{"speaker": "yuri", "expression": "flustered", "text": "A-Ah-"},
+              {"speaker": "natsuki", "expression": "smug", "text": "Called it."}],
+    "stage": ["yuri", "natsuki", "ghost"],
+    "poem": {"author": "yuri", "text": "dusk\nunfolding"},
+    "crack": "none"}), "stop", "m"))
+check("multi-line beat parsed", len(beat.turns) == 2)
+check("expression canonicalised in parse", beat.turns[0].expression == "nervous")
+check("second line canonicalised", beat.turns[1].expression == "knowing")
+check("stage filters unknown girls", beat.stage == ["yuri", "natsuki"])
+check("poem parsed with author", beat.poem["author"] == "yuri")
+check("poem keeps line breaks", "\n" in beat.poem["text"])
+check("missing stage -> None (leave as-is)",
+      d._parse(LLMResult('{"turns":[{"speaker":"monika","text":"hi"}]}',
+                         "stop", "m")).stage is None)
+check("empty stage list preserved (clear everyone)",
+      d._parse(LLMResult('{"turns":[{"speaker":"monika","text":"hi"}],"stage":[]}',
+                         "stop", "m")).stage == [])
+check("no poem key -> None", beat.poem is not None and
+      d._parse(LLMResult('{"turns":[{"speaker":"monika","text":"hi"}]}',
+                         "stop", "m")).poem is None)
+check("beat allows up to 8 lines", D._MAX_LINES == 8)
+
+print("[errors + player name]")
+
+
+class FailClient(object):
+    model = "test"
+    fallback_model = ""
+
+    def complete(self, system, messages):
+        raise D.LLMError("insufficient credit (402)")
+
+
+d = fresh(session="__test7__")
+d.client = FailClient()
+beat = d.respond("hello?")
+check("API failure still returns a renderable beat", bool(beat.turns[0].text))
+check("API failure surfaces the reason", "402" in (beat.error or ""))
+check("healthy beat has no error",
+      d._parse(LLMResult('{"turns":[{"speaker":"monika","text":"hi"}]}',
+                         "stop", "m")).error is None)
+
+d = fresh(session="__test8__")
+sys_before = d._system_prompt()
+d.set_player_name("Dfdfdf")
+check("player name invalidates the cached prompt", d._system_cache is None)
+sys_after = d._system_prompt()
+check("player name reaches the prompt", "Dfdfdf" in sys_after)
+check("player name changed the prompt", sys_before != sys_after)
+check("player name is exempt from the scalpel rule",
+      "player_name" in sys_after and "NOT secret knowledge" in sys_after)
+d.set_player_name("")
+check("blank name doesn't clobber a real one", d.player_name == "Dfdfdf")
+d._persist()
+check("player name survives restart",
+      Director(d.config, session_name="__test8__").player_name == "Dfdfdf")
+
 cleanup()
 print("\n%d passed, %d failed" % (len(PASS), len(FAIL)))
 if FAIL:

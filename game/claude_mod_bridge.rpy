@@ -17,10 +17,17 @@
 #   Play DDLC normally. When you (the prankster) want the AI to take over —
 #   e.g. right after the day-2 poem/path choice — press  F9.  From then on the
 #   club is driven by the director. Secret live controls during the takeover:
-#       -   (minus)  escalate the creepiness
-#       =   (equals) dial it back
-#       F10          open the model picker (Fable 5 / Opus / Sonnet / GLM)
+#       -   (minus)  escalate the creepiness   (ignored while typing)
+#       =   (equals) dial it back              (ignored while typing)
+#       F11 / F12    same as -/= but always work, even mid-typing
+#       F10          model picker (Opus 5 / Fable 5 / Opus 4.8 / 4.7 / Sonnet / GLM)
 #   (Later we can make F9 fire automatically at the seam; see CLAUDE_SEAM_LABEL.)
+#
+# ⚠️  TWO PIECES MUST MATCH. This file is only the visuals. Expressions, how
+#     long the girls talk, and model switching all live in the SIDECAR
+#     (game/claude_mod/). If you update this file but not the sidecar, those
+#     won't change — so on takeover the game checks the sidecar's version and
+#     warns you in-game if it's stale.
 # ─────────────────────────────────────────────────────────────────────────
 
 init python:
@@ -58,7 +65,7 @@ init python:
     # This bridge expects a sidecar at LEAST this new. Bump alongside
     # SIDECAR_VERSION in sidecar.py. If they don't match, the running sidecar is
     # stale (you updated the .rpy but not game/claude_mod) — we say so in game.
-    CLAUDE_EXPECTED_SIDECAR = "6"
+    CLAUDE_EXPECTED_SIDECAR = "7"
 
     def claude_check_sidecar():
         try:
@@ -67,19 +74,33 @@ init python:
             renpy.notify("Sidecar not reachable - is sidecar.py running?")
             return
         v = str(h.get("version", "0"))
+        store._claude_model_now = h.get("model", "?")
         if v != CLAUDE_EXPECTED_SIDECAR:
             renpy.notify("OLD SIDECAR (v%s, need v%s): update game/claude_mod "
                          "and restart sidecar.py" % (v, CLAUDE_EXPECTED_SIDECAR))
         else:
-            renpy.notify("Sidecar v%s ok - model: %s" % (v, h.get("model", "?")))
+            renpy.notify("Sidecar v%s ok - model: %s" % (v, store._claude_model_now))
 
-    def claude_bridge_escalate():
+    # Ren'Py treats [name] as variable interpolation and {tag} as a text tag, so
+    # a stray bracket in the player's message (or a model line like "[sighs]")
+    # can crash the say statement. Double them to render literally.
+    def _claude_escape(t):
+        return str(t).replace("{", "{{").replace("[", "[[")
+
+    # -/= are the secret intensity keys, but they're also characters the player
+    # types. Ignore them while the input box is up (F11/F12 always work, so the
+    # prankster is never locked out).
+    def claude_bridge_escalate(force=False):
+        if store._claude_typing and not force:
+            return
         try:
             _claude_post("/escalate", {"amount": 1})
         except Exception:
             pass
 
-    def claude_bridge_deescalate():
+    def claude_bridge_deescalate(force=False):
+        if store._claude_typing and not force:
+            return
         try:
             _claude_post("/deescalate", {"amount": 1})
         except Exception:
@@ -89,9 +110,11 @@ init python:
         try:
             resp = _claude_post("/model", {"model": slug})
             got = resp.get("model", slug)
+            store._claude_model_now = got
             renpy.notify("Director model → " + (label or got))
         except Exception:
-            renpy.notify("Couldn't switch model — restart sidecar.py?")
+            renpy.notify("Couldn't switch model — your sidecar is too old. "
+                         "Update game/claude_mod and restart sidecar.py")
 
     # ---- OPTIONAL: auto-seam. Leave "" to use the manual F9 trigger. -------
     # If you want the takeover to fire automatically when DDLC reaches a
@@ -152,10 +175,37 @@ init python:
     # DDLC pose-1 face letter. "a" is confirmed neutral; b-h are best-effort and
     # easy to correct (see a wrong face in game -> change its letter here). An
     # invalid letter for a given girl safely falls back to neutral.
+    # All four girls have pose-1 faces well past 'h' (monika 1a-1r, sayori
+    # 1a-1y, natsuki 1a-1z, yuri 1a-1w), so every letter below is valid for
+    # everyone.
     CLAUDE_POSE = "1"
     CLAUDE_MOOD = {
         "neutral": "a", "happy": "b", "laugh": "c", "sad": "d",
         "surprised": "e", "nervous": "f", "angry": "g", "knowing": "h",
+    }
+    # The director is told to send only the eight words above, but models
+    # improvise. Fold common synonyms here TOO so an off-script mood still gets
+    # a real face instead of silently going neutral (that's what made
+    # expressions look frozen before).
+    CLAUDE_MOOD_ALIAS = {
+        "normal": "neutral", "calm": "neutral", "serious": "neutral",
+        "thoughtful": "neutral", "soft": "neutral", "quiet": "neutral",
+        "smile": "happy", "pleased": "happy", "warm": "happy",
+        "content": "happy", "fond": "happy", "amused": "happy",
+        "bright": "happy", "cheerful": "happy", "gentle": "happy",
+        "excited": "laugh", "giggle": "laugh", "joy": "laugh",
+        "playful": "laugh", "teasing": "laugh", "grin": "laugh",
+        "hurt": "sad", "down": "sad", "disappointed": "sad", "hopeful": "sad",
+        "crying": "sad", "melancholy": "sad", "wistful": "sad",
+        "shock": "surprised", "startled": "surprised", "confused": "surprised",
+        "curious": "surprised", "puzzled": "surprised", "wide-eyed": "surprised",
+        "worried": "nervous", "anxious": "nervous", "scared": "nervous",
+        "embarrassed": "nervous", "shy": "nervous", "flustered": "nervous",
+        "annoyed": "angry", "mad": "angry", "pout": "angry",
+        "irritated": "angry", "defensive": "angry", "huffy": "angry",
+        "smug": "knowing", "sly": "knowing", "wry": "knowing",
+        "deadpan": "knowing", "glitch": "knowing", "cold": "knowing",
+        "sinister": "knowing", "intense": "knowing",
     }
     # Per-girl overrides (leave {} to use the shared map). A value may be a bare
     # letter ("j") or a full code ("2b"). e.g. "monika": {"knowing": "j"}
@@ -170,6 +220,7 @@ init python:
 
     # Model picker presets (label, OpenRouter slug). Edit freely.
     CLAUDE_MODELS = [
+        ("Opus 5",   "anthropic/claude-opus-5"),
         ("Fable 5",  "anthropic/claude-fable-5"),
         ("Opus 4.8", "anthropic/claude-opus-4.8"),
         ("Opus 4.7", "anthropic/claude-opus-4.7"),
@@ -198,6 +249,7 @@ init python:
 
     def claude_bridge_say(speaker, text):
         speaker = (speaker or "").lower()
+        text = _claude_escape(text)
         if speaker in CLAUDE_CHARS:
             who = _claude_char_for(speaker)
             if who is not None:
@@ -240,7 +292,7 @@ init python:
         if not text or text == "...":
             return
         try:
-            renpy.say(_claude_player_char(), text)
+            renpy.say(_claude_player_char(), _claude_escape(text))
         except Exception:
             pass
 
@@ -308,6 +360,7 @@ init python:
 
     def _claude_expr_code(speaker, expression):
         exp = (expression or "").lower().strip()
+        exp = CLAUDE_MOOD_ALIAS.get(exp, exp)        # fold synonyms first
         letter = CLAUDE_SPRITE.get(speaker, {}).get(exp) or CLAUDE_MOOD.get(exp) or "a"
         if letter[:1].isdigit():      # a full code override like "2b"
             return letter
@@ -389,19 +442,25 @@ init python:
             return
         font = CLAUDE_POEM_FONTS.get((author or "monika").lower())
         try:
-            renpy.call_screen("claude_poem", text, font)
+            renpy.call_screen("claude_poem", _claude_escape(text), font)
         except Exception:
             pass
 
 
 default _claude_started = False
 default _claude_stage = {}     # speaker -> last expression, for on-stage sprites
+default _claude_model_now = "" # last model the sidecar reported, for the F10 menu
+default _claude_typing = False # True while the player's input box is open
 
-# Secret keys: F9 starts the takeover; -/= nudge intensity; F10 picks the model.
+# Secret keys: F9 starts the takeover (once — a second press would restart the
+# scene and burn an API call); -/= nudge intensity when not typing; F11/F12 do
+# the same and always work; F10 picks the model.
 screen claude_bridge_keys():
-    key "K_F9" action Jump("claude_takeover")
+    key "K_F9" action (NullAction() if _claude_started else Jump("claude_takeover"))
     key "K_MINUS" action Function(claude_bridge_escalate)
     key "K_EQUALS" action Function(claude_bridge_deescalate)
+    key "K_F11" action Function(claude_bridge_escalate, True)
+    key "K_F12" action Function(claude_bridge_deescalate, True)
     key "K_F10" action Show("claude_model_menu")
 
 init python:
@@ -419,6 +478,8 @@ screen claude_model_menu():
         vbox:
             spacing 8
             text "Director model" size 26 xalign 0.5
+            if _claude_model_now:
+                text ("now: " + _claude_model_now) size 16 xalign 0.5
             null height 6
             for _label, _slug in CLAUDE_MODELS:
                 textbutton _label:
@@ -493,10 +554,14 @@ label claude_takeover:
 
     label claude_bridge_loop:
         python:
+            store._claude_typing = True     # -/= are text, not hotkeys, right now
             try:
-                _reply = renpy.input("", screen="claude_input", length=300) or "..."
-            except Exception:
-                _reply = renpy.input("", length=300) or "..."
+                try:
+                    _reply = renpy.input("", screen="claude_input", length=300) or "..."
+                except Exception:
+                    _reply = renpy.input("", length=300) or "..."
+            finally:
+                store._claude_typing = False
         $ claude_show_player_line(_reply)
         python:
             try:
@@ -514,13 +579,23 @@ label claude_render_beat(r):
         "..."
         return
     python:
+        # If the call actually failed, say so to the setter — otherwise a bad
+        # key/model/credit just looks like the girls going quiet forever.
+        if r.get("error"):
+            renpy.notify("Director error: " + str(r.get("error"))[:90])
         claude_bridge_bg(r.get("background", "keep"))
         claude_bridge_music(r.get("music", "keep"))
         claude_bridge_effect(r.get("effect", "none"))
         claude_set_stage(r.get("stage"))
+        _said = 0
         for _line in r.get("turns", []):
+            if not _line.get("text"):
+                continue
             claude_stage_update(_line.get("speaker"), _line.get("expression"))
             claude_bridge_say(_line.get("speaker"), _line.get("text", ""))
+            _said += 1
+        if not _said:                       # never loop back silently
+            renpy.say(None, "...")
         _poem = r.get("poem")
         if _poem:
             claude_show_poem(_poem.get("author"), _poem.get("text", ""))

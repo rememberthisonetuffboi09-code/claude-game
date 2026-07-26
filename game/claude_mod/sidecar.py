@@ -38,7 +38,7 @@ PORT = 8765
 # Bump this whenever the sidecar/director changes. The bridge compares it and
 # warns in-game if the running sidecar is older than the bridge expects — so
 # "I updated the .rpy but forgot to update the sidecar" gets caught instantly.
-SIDECAR_VERSION = "6"
+SIDECAR_VERSION = "7"
 
 _lock = threading.Lock()
 _director = None
@@ -62,6 +62,7 @@ def beat_to_dict(beat):
         "crack": beat.crack,
         "stage": beat.stage,        # list of girls on screen, or null
         "poem": beat.poem,          # {"author","text"} or null
+        "error": beat.error,        # why a beat came back empty, for the setter
         "model": beat.model,
     }
 
@@ -104,8 +105,12 @@ class Handler(BaseHTTPRequestHandler):
             d = get_director()
             try:
                 if self.path == "/respond":
+                    if data.get("player_name"):
+                        d.set_player_name(str(data.get("player_name")))
                     beat = d.respond(str(data.get("text", "")))
                     d.perform_action(beat)  # safe file effects; cues handled in Ren'Py
+                    if beat.error:
+                        print(" [error] %s" % beat.error)
                     self._send(200, beat_to_dict(beat))
                 elif self.path == "/escalate":
                     self._send(200, {"intensity": d.escalate(float(data.get("amount", 1)))})
