@@ -1,9 +1,9 @@
 """
 claude_mod — the self-aware DDLC "director brain".
 
-Pure-Python package (no Ren'Py imports) so it can be unit-tested and run
-standalone (see test_connection.py). The Ren'Py layer (claude_mod_hooks.rpy)
-imports Director and drives it.
+Pure-Python 3 package (no Ren'Py imports), run next to the game by sidecar.py.
+It is never imported by DDLC itself: the game's engine is Python 2, so the
+in-game bridge (game/claude_mod_bridge.rpy) talks to the sidecar over localhost.
 """
 
 import json

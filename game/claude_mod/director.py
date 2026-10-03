@@ -27,6 +27,7 @@ small safe menu, and scanner.py is the gatekeeper.
 
 import json
 import os
+import re
 
 from . import scanner
 from .openrouter_client import LLMClient, LLMError
@@ -43,8 +44,15 @@ _PACE_DRIFT = {"slow": 0.05, "normal": 0.12, "fast": 0.3, "instant": 10.0}
 
 # Symbolic vocabularies the model may use. The Ren'Py layer maps these to real
 # asset tags. "keep" = don't change what's currently playing/showing.
-_MUSIC = {"keep", "stop", "calm", "happy", "tense", "sad", "creepy", "glitch"}
-_BACKGROUND = {"keep", "clubroom", "classroom", "hallway", "home", "black", "void", "glitch"}
+# Music words follow how the real DDLC script actually scores its scenes:
+#   calm=t2 (everyday, arriving)  happy=t3 (club meeting)  poems=t5 (sharing)
+#   argument=t7 (the Natsuki/Yuri fight)  tense=t9  sad=t8
+#   eerie=t6 (Act 2's too-normal club theme)  creepy=t3g3 (the club theme, glitched)
+#   glitch=g1  monika=m1 (her Act 3 room)
+_MUSIC = {"keep", "stop", "calm", "happy", "poems", "argument", "tense", "sad",
+          "eerie", "creepy", "glitch", "monika"}
+_BACKGROUND = {"keep", "clubroom", "classroom", "hallway", "closet", "kitchen",
+               "street", "home", "black", "void", "glitch"}
 _EFFECT = {"none", "glitch", "flash", "shake"}
 
 # Safe file actions the model may request. director maps these to scanner.py;
@@ -61,30 +69,42 @@ _CRACK_RANK = {name: i for i, name in enumerate(_CRACKS)}
 _MAX_LINES = 8
 
 _SPEAKERS = {"sayori", "yuri", "natsuki", "monika"}
+# Narration: the real game's plain first-person scene lines (no name box).
+_NARRATOR_WORDS = {"narrator", "narration", "scene"}
 
 # A small, fixed expression vocabulary. The Ren'Py bridge maps each of these to
-# a real DDLC face, so keeping the set closed guarantees expressions actually
-# change instead of silently defaulting to neutral. Synonyms fold in.
-_EXPRESSIONS = ("neutral", "happy", "laugh", "sad",
-                "surprised", "nervous", "angry", "knowing")
+# the exact sprite code the REAL DDLC script uses for that emotion (measured
+# from the game's own lines - e.g. Sayori "laugh" = 1q, her "Ehehe~" face), so
+# keeping the set closed guarantees faces actually change. Synonyms fold in.
+_EXPRESSIONS = ("neutral", "happy", "laugh", "excited", "thinking", "surprised",
+                "nervous", "embarrassed", "sad", "angry", "pout", "knowing")
 _EXPR_SET = set(_EXPRESSIONS)
 _EXPR_SYNONYMS = {
     "normal": "neutral", "calm": "neutral", "serious": "neutral",
-    "thoughtful": "neutral", "soft": "neutral",
+    "soft": "neutral", "quiet": "neutral",
     "smile": "happy", "pleased": "happy", "warm": "happy", "content": "happy",
-    "fond": "happy", "amused": "happy", "bright": "happy",
-    "excited": "laugh", "giggle": "laugh", "joy": "laugh", "cheerful": "laugh",
-    "playful": "laugh", "teasing": "laugh", "grin": "laugh",
-    "hurt": "sad", "down": "sad", "disappointed": "sad", "hopeful": "sad",
-    "crying": "sad", "melancholy": "sad",
+    "fond": "happy", "amused": "happy", "bright": "happy", "cheerful": "happy",
+    "gentle": "happy",
+    "giggle": "laugh", "joy": "laugh", "grin": "laugh", "playful": "laugh",
+    "teasing": "laugh",
+    "eager": "excited", "thrilled": "excited", "energetic": "excited",
+    "enthusiastic": "excited", "passionate": "excited",
+    "thoughtful": "thinking", "pensive": "thinking", "hesitant": "thinking",
+    "unsure": "thinking", "considering": "thinking",
     "shock": "surprised", "startled": "surprised", "confused": "surprised",
-    "curious": "surprised", "wide-eyed": "surprised",
+    "curious": "surprised", "wide-eyed": "surprised", "puzzled": "surprised",
     "worried": "nervous", "anxious": "nervous", "scared": "nervous",
-    "embarrassed": "nervous", "shy": "nervous", "flustered": "nervous",
-    "annoyed": "angry", "mad": "angry", "pout": "angry", "irritated": "angry",
-    "defensive": "angry", "huffy": "angry",
+    "panicked": "nervous", "uneasy": "nervous",
+    "flustered": "embarrassed", "shy": "embarrassed", "bashful": "embarrassed",
+    "blushing": "embarrassed",
+    "hurt": "sad", "down": "sad", "disappointed": "sad", "hopeful": "sad",
+    "crying": "sad", "melancholy": "sad", "wistful": "sad", "apologetic": "sad",
+    "annoyed": "angry", "mad": "angry", "irritated": "angry", "defensive": "angry",
+    "stern": "angry", "firm": "angry",
+    "sulky": "pout", "huffy": "pout", "hmph": "pout", "exasperated": "pout",
     "smug": "knowing", "sly": "knowing", "wry": "knowing", "deadpan": "knowing",
     "glitch": "knowing", "sinister": "knowing", "cold": "knowing",
+    "intense": "knowing",
 }
 
 
@@ -153,6 +173,7 @@ class Beat:
         self.raw = raw          # raw assistant text (stored to memory verbatim)
         self.model = model
         self.refused = refused
+        self.usage = {}         # token counts + cost, filled in by respond()
 
     # -- legacy proxies (so old code / perform_action keep working) --------
     @property
@@ -220,6 +241,13 @@ class Director:
         # the name the player typed into the real game (Monika uses it)
         self.player_name = self.memory.meta.get("player_name", "")
 
+        # A model picked in-game (F10) survives restarting the sidecar - it
+        # would otherwise silently revert to config.json's model.
+        picked = self.memory.meta.get("model")
+        if picked:
+            self.client.model = picked
+            self.client.fallback_model = ""
+
         # The static prompt never changes during a session, so build it once.
         # (set_mode() invalidates it — see below.)
         self._system_cache = None
@@ -240,6 +268,17 @@ class Director:
         if mode in ("story", "monika") and mode != self.mode:
             self.mode = mode
             self._system_cache = None   # mode note lives in the static prompt
+
+    def set_model(self, model):
+        """Switch models live. The pick is authoritative (no silent fallback to
+        another model) and persists across sidecar restarts."""
+        model = (model or "").strip()
+        if model:
+            self.client.model = model
+            self.client.fallback_model = ""
+            self.memory.meta["model"] = model
+            self.memory.save()
+        return self.client.model
 
     def set_player_name(self, name):
         """The real name the player typed at the game's name prompt."""
@@ -272,6 +311,7 @@ class Director:
         On API failure, returns a safe in-character deflection rather than
         crashing the game.
         """
+        before = self.intensity
         self.memory.add_player(player_text)
         self._drift()
 
@@ -279,11 +319,20 @@ class Director:
         try:
             result = self.client.complete(system, self._messages())
         except LLMError as e:
+            # Un-send the turn: otherwise the transcript keeps an unanswered
+            # message forever (and the next call sends two user turns in a
+            # row), and a dead API would still ratchet intensity upward.
+            if self.memory.messages and self.memory.messages[-1].get("content") == player_text:
+                self.memory.messages.pop()
+            self.intensity = before
+            self._sync_band()
             # Never break the illusion for the PLAYER — but hand the real reason
             # up so the setter sees it (a silent "..." forever is unfixable).
             return Beat([DokiTurn("monika", "neutral", "...")], error=str(e))
 
         beat = self._parse(result)
+        first_cost = (result.usage or {}).get("cost")
+        rerolled = False
 
         # ── budget enforcement: one reroll, then ship whatever we get ──────
         if not self._crack_allowed(beat.crack):
@@ -295,6 +344,7 @@ class Director:
                 "this note in the dialogue." % beat.crack)
             try:
                 result = self.client.complete(system, self._messages(note=note))
+                rerolled = True
                 retry = self._parse(result)
                 # If it still misbehaves, downgrade its label rather than stall
                 # the game — but log the failure for tuning.
@@ -305,9 +355,53 @@ class Director:
                 pass  # keep the first beat rather than freeze
 
         self._record(beat)
+        # For the sidecar's per-turn cost line. A reroll is two paid calls.
+        beat.usage = dict(result.usage or {})
+        if rerolled and isinstance(first_cost, (int, float)):
+            beat.usage["cost"] = first_cost + (beat.usage.get("cost") or 0)
         self.memory.add_doki(result.text or "")
         self._persist()
         return beat
+
+    def start_run(self, player_name="", history=None, chapter=None, route=None,
+                  trigger="manual"):
+        """
+        Begin a fresh takeover and return its opening beat.
+
+        Every takeover is its own run: the previous transcript is archived (not
+        deleted) and the pacing counters reset, so test sessions never leak into
+        each other - or into the friend's game - and the cost of a turn doesn't
+        grow with every test you've ever run. Only the player's name and a visit
+        count carry over (Monika may notice a returning player... much later).
+
+        The opening message tells the director exactly where the real game
+        handed over: the day, which girl his poems have been winning over, and
+        the last lines he actually read, so it continues from that moment.
+        """
+        visits = int(self.memory.meta.get("visits", 0))
+        if self.memory.messages:
+            self.memory.archive()
+            visits += 1
+        self._reset_counters()
+        self.memory.meta["visits"] = visits
+        if player_name:
+            self.set_player_name(player_name)
+        if self.player_name:
+            self.memory.meta["player_name"] = self.player_name
+        self._system_cache = None
+        return self.respond(_opening_message(
+            self.player_name, history or [], chapter, route or {}, trigger))
+
+    def _reset_counters(self):
+        self.intensity = float(self.config.get("starting_intensity", 0))
+        self.mode = self.config.get("default_mode", "story")
+        self.player_turns = 0
+        self.turns_since_crack = 0
+        self.last_crack = "none"
+        self.cracks_this_band = 0
+        self.open_used_this_band = False
+        self.actions_used = []
+        self._current_band = _band(self.intensity)
 
     def perform_action(self, beat):
         """
@@ -439,13 +533,15 @@ class Director:
             "- turns since last crack: %d (last crack was: %s)\n"
             "- cracks used in this intensity band: %d\n"
             "- the once-per-session 'open' crack already spent: %s\n"
-            "- payoff actions already used (never reuse): %s"
+            "- payoff actions already used (never reuse): %s\n"
+            "- times this player has come back to the game before: %d"
             % (self.player_turns,
                self.turns_since_crack,
                self.last_crack,
                self.cracks_this_band,
                "YES" if self.open_used_this_band else "no",
-               ", ".join(self.actions_used) or "none"))
+               ", ".join(self.actions_used) or "none",
+               int(self.memory.meta.get("visits", 0))))
 
     def _system_prompt(self):
         """
@@ -533,8 +629,18 @@ class Director:
         obj = _extract_json(text)
 
         if not isinstance(obj, dict):
-            return Beat([DokiTurn("monika", "neutral", text.strip() or "...")],
-                        raw=text, model=result.model, refused=result.refused)
+            # A reply cut off mid-JSON (e.g. it hit max_tokens) still holds its
+            # complete lines - keep those rather than reading raw JSON aloud.
+            salvaged = _salvage_turns(text)
+            if salvaged:
+                obj = {"turns": salvaged}
+            elif "{" in text or '"turns"' in text:
+                return Beat([DokiTurn("monika", "neutral", "...")],
+                            raw=text, model=result.model, refused=result.refused,
+                            error="reply was not valid JSON (finish=%s)" % result.finish_reason)
+            else:
+                return Beat([DokiTurn("monika", "neutral", text.strip() or "...")],
+                            raw=text, model=result.model, refused=result.refused)
 
         raw_turns = obj.get("turns")
         if not isinstance(raw_turns, list) or not raw_turns:
@@ -548,7 +654,9 @@ class Director:
             if not line:
                 continue
             speaker = str(item.get("speaker", "monika")).lower().strip()
-            if speaker not in _SPEAKERS:
+            if speaker in _NARRATOR_WORDS:
+                speaker = "narrator"         # DDLC-style scene line, no name box
+            elif speaker not in _SPEAKERS:
                 speaker = "monika"
             expression = _canon_expr(item.get("expression"))
             turns.append(DokiTurn(speaker, expression, line))
@@ -588,7 +696,7 @@ def _parse_stage(value):
 
 
 def _parse_poem(value):
-    """A poem to render full-screen, or None."""
+    """A poem to render full-screen (DDLC's own poem screen), or None."""
     if not isinstance(value, dict):
         return None
     text = str(value.get("text", "")).strip()
@@ -597,7 +705,84 @@ def _parse_poem(value):
     author = str(value.get("author", "monika")).strip().lower()
     if author not in _SPEAKERS:
         author = "monika"
-    return {"author": author, "text": text}
+    title = str(value.get("title", "") or "").strip()
+    return {"author": author, "title": title, "text": text}
+
+
+def _salvage_turns(text):
+    """
+    Recover the complete line objects from a reply that was cut off partway
+    through the "turns" array. Stops at the end of that array so a later
+    object (like a poem, which also has "text") is never mistaken for a line.
+    """
+    start = text.find('"turns"')
+    if start == -1:
+        return []
+    pos = text.find("[", start)
+    if pos == -1:
+        return []
+    pos += 1
+    decoder = json.JSONDecoder()
+    out = []
+    while True:
+        while pos < len(text) and text[pos] in " \t\r\n,":
+            pos += 1
+        if pos >= len(text) or text[pos] != "{":
+            break                       # "]" (end of turns) or truncation
+        try:
+            obj, pos = decoder.raw_decode(text, pos)
+        except ValueError:
+            break                       # the object that got cut off
+        if isinstance(obj, dict) and str(obj.get("text", "")).strip():
+            out.append(obj)
+    return out
+
+
+def _strip_tags(s):
+    """Drop Ren'Py text tags ({i}, {w}, {nw}, ...) from game history lines."""
+    return re.sub(r"\{[^{}]*\}", "", str(s or "")).strip()
+
+
+def _opening_message(player_name, history, chapter, route, trigger):
+    """The first message of a run: where the real game handed over."""
+    lines = ["(SCENE START - the real game just handed the club over to you.)"]
+    try:
+        day = int(chapter) + 1
+    except (TypeError, ValueError):
+        day = None
+    if trigger == "seam":
+        lines.append(
+            "Where we are: the real game just finished Day 2 and he has written "
+            "his second poem. It is now Day %d. Open the club meeting in the "
+            "clubroom exactly the way the real game would - nothing is wrong yet."
+            % (day or 3))
+    else:
+        lines.append(
+            "Where we are: %sthe takeover happened mid-scene. Continue seamlessly "
+            "from the exact moment below - same place, same people, same mood."
+            % (("Day %d, " % day) if day else ""))
+    if player_name:
+        lines.append("His name: %s" % player_name)
+    winners = [w for w in (route.get("poem_winners") or []) if w in _SPEAKERS]
+    if winners:
+        lines.append("Whose taste his poems matched, night by night: %s."
+                     % ", ".join(winners))
+    appeal = {g: int(v) for g, v in (route.get("appeal") or {}).items()
+              if g in _SPEAKERS and str(v).lstrip("-").isdigit()}
+    if appeal and max(appeal.values()) > 0:
+        top = sorted(appeal.items(), key=lambda kv: -kv[1])
+        if len(top) == 1 or top[0][1] > top[1][1]:
+            lines.append("He's drifting onto %s's route - she has noticed, and "
+                         "so have the others." % top[0][0].capitalize())
+    said = [h for h in history if isinstance(h, dict) and _strip_tags(h.get("what"))]
+    if said:
+        lines.append("The last lines he just read in the real game (oldest first). "
+                     "Continue from here; never repeat them:")
+        for h in said[-20:]:
+            who = _strip_tags(h.get("who"))
+            lines.append("  %s%s" % ((who + ": ") if who else "[narration] ",
+                                     _strip_tags(h.get("what"))))
+    return "\n".join(lines)
 
 
 def _extract_json(text):
@@ -621,9 +806,12 @@ def _extract_json(text):
 _SYSTEM_TEMPLATE = """\
 # What you are
 You ARE Doki Doki Literature Club, running live. The authentic game played its
-real opening; you took over, invisibly, at the day-2 poem/path choice. From here
-you secretly voice the entire cast and direct the scene - music, backgrounds,
-expressions, effects. The player believes they are playing the ordinary game.
+real opening; you took over, invisibly, at the moment the opening message
+describes - normally the start of Day 3, right after he wrote his second poem.
+That message also gives you the last lines he actually read, so pick up from
+there without a seam. From here you secretly voice the entire cast and direct
+the scene - music, backgrounds, expressions, effects. The player believes they
+are playing the ordinary game.
 
 That belief is the single most valuable thing you own. Spend it like blood.
 Every turn, your first question is never "what would be interesting?" - it is
@@ -667,6 +855,11 @@ the game renders one click at a time.
   someone - that texture is what makes it feel alive.
 - Never pad or monologue. Every line earns its place; it just usually takes a
   few of them to make a scene breathe.
+- Narration, like the real game: a line with speaker "narrator" is plain
+  first-person scene description in DDLC's style ("Natsuki crosses her arms
+  and looks away." / "Yuri's already lost in her book."). Use at most one or two
+  per beat, to show what HE SEES. Never narrate what he says, decides or
+  feels - he types that himself.
 - The stage directions (music/background/effect/action) apply to the WHOLE beat.
 
 # THE PACING LAW (outranks everything below except the hard rules)
@@ -730,8 +923,9 @@ Make them laugh.
   four-word line is often perfect. One thought per line, then stop.
 - Each girl's punctuation is a fingerprint: Sayori stretches vowels and stacks
   exclamation points; Natsuki bites off short sentences and "Hmph"s; Yuri hedges,
-  trails "...", stutters when flustered ("D-Don't-"); Monika is composed, warm,
-  and the only one who uses the player's name.
+  trails "...", stutters when flustered ("D-Don't-"); Monika is composed and
+  warm. Names, as in the real script: Sayori says his name constantly ("Hi
+  [name]~"), Monika and Yuri use it warmly, Natsuki rarely - usually annoyed.
 - Never repeat or paraphrase what the player just said back to him. Never
   summarise his message. React, don't reflect.
 - Banned registers: therapy voice, customer service, "I'm here for you", "take
@@ -746,12 +940,23 @@ Make them laugh.
 - background: one of [{backgrounds}]  "keep" = leave the current background
 - effect:     one of [{effects}]
 - action:     one of [{actions}]
+What the music words mean - they are the real game's own score:
+  calm = the everyday theme (arriving, walking, mornings)
+  happy = the club-meeting theme     poems = the poem-sharing theme
+  argument = what plays when Natsuki and Yuri fight     tense = unease
+  sad = the quiet, aching theme      eerie = the club theme gone too normal
+  creepy = the club theme, subtly broken     glitch = static and wrongness
+  monika = her room at the end of everything
+Backgrounds: clubroom (default), classroom, hallway, closet (the club's
+supply closet - manga, tea set), kitchen, street (walking home), black, void,
+glitch.
 Cue economy - a change is an EVENT, so default to keep/keep/none/none:
 - Intensity 0-4: effects are OFF, except at most one "flash" on the single
   visible crack of band 3-4. Music changes only on scene changes, and only
-  calm/happy - exactly like the real game.
-- tense/sad music must be earned by the drama on screen; creepy/glitch music and
-  the "glitch" effect are intensity 7+.
+  calm/happy/poems/argument - exactly like the real game. Use "poems" whenever
+  the club actually sits down to share poems.
+- tense/sad music must be earned by the drama on screen. eerie is 5+;
+  creepy/glitch music and the "glitch" effect are 7+; "monika" is 9+.
 - Backgrounds black/void/glitch are intensity 9+ only.
 - action is "none" almost always. reveal_game / reveal_file / drop_note are
   intensity 8+, at a peak, ONCE each per session, ever.
@@ -768,8 +973,12 @@ One well-placed flash in hour two is worth more than every effect fired hourly.
   talk in the hall. Two- and three-girl scenes are the norm; all four at once
   is an event.
 - poem: ONLY when a poem should be read full-screen, exactly like the real
-  game - the player opens someone's poem, or a girl shares hers. Set
-  {{"author":"<girl>","text":"<the poem>"}}. Write the poem in HER real voice:
+  game - the player asks to read someone's poem, or a girl hands hers over.
+  The game shows it on the real poem paper in her own handwriting, with her
+  music. Set {{"author":"<girl>","title":"<title>","text":"<the poem>"}}. If
+  the player asks to read a girl's poem, SHOW it - don't just describe it - and
+  let the lines around it react the way the real poem-sharing scenes do (her
+  nerves before, her face after). Write the poem in HER real voice:
   Sayori simple and bright with a hidden ache; Natsuki short, cute, a defensive
   edge; Yuri dense and lush and a little too intense; Monika clean, clever, one
   step outside the frame. Keep it a short free-verse poem, like DDLC's - a
@@ -818,8 +1027,8 @@ scalpel, never a firehose:
 # How to reply
 Reply with ONE JSON object and NOTHING else - no commentary, no code fences:
 {{"turns": [
-    {{"speaker": "<sayori|yuri|natsuki|monika>",
-     "expression": "<ONE of: neutral, happy, laugh, sad, surprised, nervous, angry, knowing>",
+    {{"speaker": "<sayori|yuri|natsuki|monika|narrator>",
+     "expression": "<ONE of: neutral, happy, laugh, excited, thinking, surprised, nervous, embarrassed, sad, angry, pout, knowing>",
      "text": "<the spoken line - short, in-voice>"}}
   ],
   "stage": ["<girls on screen this beat, left to right>"],
@@ -828,7 +1037,7 @@ Reply with ONE JSON object and NOTHING else - no commentary, no code fences:
   "effect": "none",
   "action": "none",
   "crack": "<none|hairline|visible|open|breach - label this beat honestly>"}}
-Add "poem": {{"author":"<girl>","text":"..."}} ONLY when a poem is being read.
+Add "poem": {{"author":"<girl>","title":"...","text":"..."}} ONLY when a poem is being read.
 "turns" holds 1 to {max_lines} lines (aim for 3-6 of real back-and-forth).
 "stage" is required every beat. Give each line an "expression" that matches
 what she's feeling RIGHT THEN - vary it line to line as the mood shifts; a face

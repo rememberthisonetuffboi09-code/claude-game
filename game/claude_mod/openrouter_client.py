@@ -76,13 +76,40 @@ class LLMClient:
         self.model = config.get("model", "openrouter/auto")
         self.fallback_model = (config.get("fallback_model") or "").strip()
         self.temperature = float(config.get("temperature", 0.9))
-        self.max_tokens = int(config.get("max_tokens", 900))
+        # A beat is up to 8 lines of JSON. Below ~1200 a long scene can be cut
+        # off mid-object. This is only a ceiling - you pay for tokens actually
+        # generated - so raising an old config's 900 costs nothing extra.
+        self.max_tokens = max(int(config.get("max_tokens", 1400)), 1200)
         self.timeout = int(config.get("request_timeout_seconds", 90))
         self.referer = config.get("referer", "")
         self.title = config.get("title", "DDLC Director Mod")
         # caching
         self.cache_enabled = bool(config.get("enable_prompt_cache", True))
         self.cache_ttl = config.get("cache_ttl", "5m")      # "5m" or "1h"
+
+    def model_exists(self, model):
+        """
+        Ask OpenRouter whether a model id is real, via its free endpoint listing
+        (GET /models/<id>/endpoints - no tokens, no cost). True / False, or None
+        when we can't tell (offline, OpenRouter hiccup) - callers treat None as
+        "allow". Variants like ":free" are checked as their base model.
+        """
+        model = (model or "").strip().split(":")[0]
+        if "/" not in model:
+            return False
+        api_root = self.url.split("/chat/completions")[0].rstrip("/")
+        req = urllib.request.Request(
+            "%s/models/%s/endpoints" % (api_root, model),
+            headers={"Authorization": "Bearer %s" % self.api_key})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            return False if e.code == 404 else None
+        except Exception:  # noqa: BLE001 - network trouble: can't tell
+            return None
+        endpoints = (data.get("data") or {}).get("endpoints")
+        return True if endpoints is None else bool(endpoints)
 
     def _supports_cache(self):
         """Explicit cache_control is an Anthropic feature on OpenRouter."""

@@ -72,3 +72,32 @@ class Memory:
         self.messages = []
         self.meta = {}
         self.save()
+
+    # What survives into the next run: who he is, how often he's come back,
+    # and which model the setter picked. Everything else starts clean.
+    _CARRY = ("visits", "player_name", "model")
+
+    def archive(self):
+        """
+        Move this run's transcript into memory/archive/ (kept, never deleted)
+        and start a clean one. Called when a new takeover begins, so test runs
+        don't pile into one ever-growing (ever-more-expensive) conversation.
+        """
+        if self.messages:
+            try:
+                arch = os.path.join(_MEM_DIR, "archive")
+                os.makedirs(arch, exist_ok=True)
+                base = "%s-%s" % (self.session_name, time.strftime("%Y%m%d-%H%M%S"))
+                dest, n = os.path.join(arch, base + ".json"), 1
+                while os.path.exists(dest):
+                    n += 1
+                    dest = os.path.join(arch, "%s-%d.json" % (base, n))
+                with open(dest, "w", encoding="utf-8") as f:
+                    json.dump({"messages": self.messages, "meta": self.meta,
+                               "archived_at": time.time()},
+                              f, ensure_ascii=False, indent=2)
+            except (IOError, OSError):
+                pass        # an archive failure must never block a new run
+        self.messages = []
+        self.meta = {k: self.meta[k] for k in self._CARRY if k in self.meta}
+        self.save()

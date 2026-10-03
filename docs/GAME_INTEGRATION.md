@@ -1,109 +1,118 @@
-# Putting it into the actual game
+# Running it inside DDLC
 
-Base DDLC runs on an old Python 2 engine; our director is Python 3. So the
-brain runs as a small **sidecar** program and the game talks to it locally.
-Two pieces:
+Base DDLC runs on an old engine (Ren'Py 6.99, Python 2); the director is
+Python 3. So the brain runs as a small **sidecar** program next to the game,
+and one small file inside the game talks to it over `localhost`.
 
-| Piece | What it is | Where it runs |
+| Piece | What it is | Where it lives |
 |---|---|---|
-| **Sidecar** | `game/claude_mod/` (director, persona, `sidecar.py`, your `config.json`) | Runs on your PC as `python sidecar.py`, separate from the game. Makes the OpenRouter calls. |
-| **Bridge** | `game/claude_mod_bridge.rpy` (one small file) | Goes **into DDLC's `game/` folder.** Talks to the sidecar over `localhost`. |
+| **Sidecar** (the brain) | `game/claude_mod/` — director, persona, `sidecar.py`, your `config.json` | Stays in this folder. You run it; it calls OpenRouter. |
+| **Bridge** (the visuals) | `game/claude_mod_bridge.rpy` | Inside DDLC's `game/` folder. **The sidecar installs it for you.** |
 
-> ⚠️ For base DDLC, copy **only** `claude_mod_bridge.rpy` into the game. Do NOT
-> copy `claude_mod_hooks.rpy` or the `claude_mod/` folder into DDLC — those are
-> Python 3 and will crash the old engine. The `claude_mod/` folder is the
-> sidecar; it runs on its own.
+> Never copy the `claude_mod/` folder into DDLC — it's Python 3 and would crash
+> the game's engine. Only the bridge goes in, and the sidecar handles that.
 
-## First run (on your machine)
+## First run
 
-1. **Make your config** — in the unzipped repo, copy
-   `game/claude_mod/config.example.json` to `game/claude_mod/config.json` and
-   paste your OpenRouter key.
-2. **Start the sidecar** — open a terminal in the repo folder and run:
+1. **Your key** — copy `game/claude_mod/config.example.json` to
+   `game/claude_mod/config.json` and paste your OpenRouter key into
+   `"api_key"`.
+2. **Start the sidecar** — open a terminal in this folder and run:
    ```
    python game/claude_mod/sidecar.py
    ```
-   Leave that window open. It prints `listening: http://127.0.0.1:8765`.
-   (Quick check: `python game/claude_mod/test_connection.py` should print a
-   real Monika line now that you have credit.)
-3. **Install the bridge** — copy `game/claude_mod_bridge.rpy` into your DDLC's
-   `game/` folder (e.g. `ddlc-win/game/`).
-4. **Play** — launch DDLC. Play normally. When you want the AI to take over
-   (right after the day-2 poem/path choice is the intended spot), press **F9**.
-   From then on the club is live.
-   - **`-`** = escalate the creep · **`=`** = dial it back (secret, mid-play).
-     These are ignored while the player is typing, so a hyphen in their message
-     can't secretly escalate. **F11 / F12** do the same and always work.
-   - **F10** = model picker (Opus 5 / Fable 5 / Opus 4.8 / Opus 4.7 / Sonnet 5 /
-     GLM). Switches the director's model live via the sidecar's `/model`
-     endpoint; the menu shows which model is currently loaded, the game toasts
-     the change, and the sidecar window prints `[model] switched to …`.
+   Leave that window open. Its banner tells you everything:
+   ```
+    DDLC director sidecar   (version 8)
+    listening: http://127.0.0.1:8765
+    model:     anthropic/claude-opus-5  ...
+    bridge:    installed (stale .rpyc removed) -> C:\...\DDLC-1.1.1-pc\game
+   ```
+   It finds DDLC by itself when it sits near this folder (e.g. both in
+   Downloads). If it says it couldn't, add `"ddlc_game_dir": "C:/path/to/DDLC-1.1.1-pc"`
+   to `config.json`.
+3. **Play** — launch DDLC and start a new game. Everything up to and including
+   the **day-2 poem** is the untouched real game. When day 3's club meeting
+   starts, the AI takes over by itself. (Press **F9** to take over earlier, for
+   testing.)
 
-The bridge now handles the visuals itself: each girl gets her own DDLC-styled
-**name box** (colour + quotes), her **sprite appears and repositions** as girls
-join the scene, **music/background** cues map to real base-DDLC tracks
-(`t3`/`t4`/`t8`/`t9`/`g1`/`g2`, `club_day`/`class_day`/…), and `shake`/`flash`
-effects use Ren'Py's built-in `vpunch`/`Fade`. The takeover also reads the
-player's entered name (`persistent.playername`) and hands it to the director so
-Monika can use it.
+## Controls (secret, during the takeover)
 
-If F9 says "Can't reach the director," the sidecar window isn't running — start
-step 2 and press F9 again.
-
-## ⚠️ Updating the mod: you must update BOTH pieces
-
-This is the single easiest thing to get wrong. The bridge `.rpy` only draws the
-scene. **Expressions, how long the girls talk, and model switching all live in
-the sidecar** (`game/claude_mod/`). Updating one and not the other means those
-features silently don't change.
-
-So after any update:
-
-1. Replace `claude_mod_bridge.rpy` in DDLC's `game/` folder, and **delete the
-   stale `claude_mod_bridge.rpyc`** next to it (Ren'Py caches compiled code;
-   leave it and the game keeps running the OLD bridge).
-2. Replace the changed files in `game/claude_mod/` (usually `director.py` and
-   `sidecar.py`). Your `config.json` is never touched.
-3. **Restart the sidecar** (`Ctrl+C`, then run it again).
-
-The mod checks this for you. The sidecar reports a `SIDECAR_VERSION`, and when
-the takeover starts the bridge compares it against `CLAUDE_EXPECTED_SIDECAR` and
-shows a toast:
-
-| Toast on F9 | Meaning |
+| Key | Does |
 |---|---|
-| `Sidecar v7 ok - model: …` | Both halves current. Everything active. |
-| `OLD SIDECAR (v…, need v7)` | The brain is stale — do step 2 + 3 above. |
-| `Sidecar not reachable` | `sidecar.py` isn't running at all. |
+| `-` / `=` | creepier / calmer (ignored while the player is typing, so a hyphen in his message can't trigger it) |
+| **F5 / F6** | creepier / calmer, works even while he's typing |
+| **F10** | model picker. Each id is checked with OpenRouter first (free); the pick survives restarts. |
+| **F9** | take over right now (only once per game; does nothing on the main menu) |
+| Enter on an empty box | let the club keep talking without saying anything |
 
-If a call fails (bad key, no credit, unknown model slug) the girls say "..." to
-keep the illusion, but you get a `Director error: …` toast and the sidecar
-window prints the real reason — so a dead API never looks like a quiet club.
+F11 is left alone — it's the engine's fullscreen key.
 
-## Making it look right (next tuning passes)
+The sidecar window logs every turn: which model answered, tokens, the cost,
+the run's running total, and the current intensity. Intensity changes from the
+secret keys show up there too, never in the game.
 
-- **Name boxes / music / backgrounds:** working out of the box (base-DDLC
-  tags). Edit `CLAUDE_NAME_COLORS`, `CLAUDE_MUSIC`, `CLAUDE_BG` at the top of
-  `claude_mod_bridge.rpy` if your HD assets use different names/colours.
-- **Sprite expressions:** `CLAUDE_SPRITE` currently maps only `_default`/`happy`/
-  `surprised` (safe base-DDLC codes); every other mood falls back to a neutral
-  pose so a sprite always shows and nothing crashes. Fill in more per-girl codes
-  (`1a`/`1b`/`2a`… for base DDLC, or your DDLC+ tags) once you've picked which
-  sprite set you're shipping.
-- **Auto-seam (optional):** to make F9 automatic, set `CLAUDE_LOG_LABELS = True`
-  in the bridge, play to the day-2 choice, open `claude_labels.log`, find the
-  label that fired at that moment, and put it in `CLAUDE_SEAM_LABEL`.
+## What it looks like in game
 
-## Giving it to your friend (final packaging)
+Everything visual reuses DDLC's own pieces, checked against the game's source:
 
-The friend shouldn't need Python. On your Windows machine, once:
+- **Name boxes, quotes, click-to-continue arrow**: DDLC's say screen. Names are
+  white with the pink outline, exactly like the real game.
+- **His own lines**: DDLC's `mc` character, so his typed message shows with his
+  name, and lands in the **History** screen with everyone else's.
+- **Typing**: inside the real textbox, same font, wrapping and caret.
+- **Sprites**: DDLC's own slots (`t11` for one girl … `t41`–`t44` for four) at
+  the game's size; whoever is speaking steps forward (`f`-transforms), and girls
+  who leave fade out (`thide`). Leftover sprites from the real game are cleared.
+- **Faces**: twelve moods mapped to the exact sprite codes DDLC's script uses
+  for each emotion — e.g. Sayori's "Ehehe~" face (`1q`), Natsuki's "Hmph."
+  (`5s`), Monika's teasing lean-in (`5a`). Change any in `CLAUDE_FACES`.
+- **Poems**: DDLC's own `showpoem` — the real paper, each girl's handwriting
+  font, her version of the poem music, the page-turn sound.
+- **Music**: the real game's cues (`t2` arriving, `t3` club, `t5` poem sharing,
+  `t7` the Natsuki/Yuri fight, `t8` sad, `t9` tense) plus its glitched tracks
+  for later; a cue for the song already playing never restarts it.
+- **Glitch effect**: DDLC's own screen tear.
+
+The AI is also told exactly where the real game handed over: the day, which
+girl his poems have been winning over, and the last ~20 lines he read.
+
+Each takeover is a **fresh run**: the previous transcript is archived (in
+`game/claude_mod/memory/archive/`, never deleted), so test sessions don't pile
+up into one ever-more-expensive conversation, and your tests never leak into
+your friend's game.
+
+## Updating
+
+```
+python update.py
+```
+Downloads the latest version and replaces the code — never your `config.json`,
+`dossier.json` or `memory/`. Anything you'd edited (like the character bible)
+is saved in `update_backup/` first. Then restart the sidecar, and it installs
+the matching bridge into DDLC by itself.
+
+When a takeover starts, the game checks the sidecar's version. If you see
+**"OLD SIDECAR"**, the brain wasn't restarted after an update.
+
+## When something's off
+
+| You see | Means |
+|---|---|
+| `Sidecar not reachable` toast | `sidecar.py` isn't running. Start it, then press F9. |
+| `OLD SIDECAR (vX, need v8)` toast | Restart the sidecar (after `python update.py`). |
+| Sidecar says **ALREADY RUNNING** on start | An old sidecar window is still open — the game is talking to *that* one. Close it, start again. |
+| `Director error: ...402...` toast | Out of OpenRouter credit. |
+| `Not switched: OpenRouter doesn't know ...` | That model id doesn't exist on OpenRouter; pick another. |
+| The girls say "..." | The real reason is in the toast and in the sidecar window. |
+
+## Giving it to your friend (later)
+
+The friend shouldn't need Python. Once it plays the way you want:
 
 1. `pip install pyinstaller`
 2. `pyinstaller --onefile --add-data "game/claude_mod;claude_mod" game/claude_mod/sidecar.py`
-   → produces `dist/sidecar.exe` (the whole brain in one file, key baked into
-   its `config.json` — set a spend cap and rotate after).
-3. Ship the friend: your DDLC build (with `claude_mod_bridge.rpy` inside) +
-   `sidecar.exe` + a `Start.bat` that launches `sidecar.exe` then the game.
-   One double-click, no Python required.
-
-We'll walk through this together once the in-game part looks the way you want.
+   → `dist/sidecar.exe`
+3. Ship: your DDLC folder (bridge already inside) + `sidecar.exe` + a
+   `Start.bat` that starts `sidecar.exe`, then the game. Set a spend limit on
+   the key you ship, and rotate it afterwards.

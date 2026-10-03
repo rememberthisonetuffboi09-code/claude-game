@@ -52,22 +52,27 @@ def beat_json(crack="none", text="Poems out, everyone!", speaker="sayori", n=1):
                        "effect": "none", "action": "none", "crack": crack})
 
 
+# Tests get their OWN memory folder. (They used to wipe the real
+# game/claude_mod/memory/ - running the tests would have deleted your saved
+# conversations.)
+import tempfile                                               # noqa: E402
+from claude_mod import memory as _memory_mod                  # noqa: E402
+_TEST_MEM = tempfile.mkdtemp(prefix="ddlc_test_mem_")
+_memory_mod._MEM_DIR = _TEST_MEM
+
+
 def fresh(config_extra=None, session="__test__"):
     cfg = {"api_key": "test", "model": "anthropic/claude-fable-5",
            "enable_local_scan": False, "pace": "normal", "starting_intensity": 0}
     cfg.update(config_extra or {})
-    mem_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
-                           "game", "claude_mod", "memory")
-    shutil.rmtree(mem_dir, ignore_errors=True)
+    shutil.rmtree(_TEST_MEM, ignore_errors=True)
     d = Director(cfg, session_name=session)
     d.client = FakeClient([])
     return d
 
 
 def cleanup():
-    mem_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..",
-                           "game", "claude_mod", "memory")
-    shutil.rmtree(mem_dir, ignore_errors=True)
+    shutil.rmtree(_TEST_MEM, ignore_errors=True)
 
 
 # ── 1. parsing ─────────────────────────────────────────────────────────────
@@ -236,7 +241,7 @@ check("synonym folds to canonical", D._canon_expr("smug") == "knowing")
 check("unknown mood -> neutral", D._canon_expr("banana") == "neutral")
 check("case/space tolerant", D._canon_expr("  ANGRY ") == "angry")
 check("empty -> neutral", D._canon_expr(None) == "neutral")
-check("every canonical mood is distinct", len(set(D._EXPRESSIONS)) == 8)
+check("12 distinct canonical moods", len(set(D._EXPRESSIONS)) == 12 == len(D._EXPRESSIONS))
 check("no synonym shadows a canonical word",
       not (set(D._EXPR_SYNONYMS) & set(D._EXPRESSIONS)))
 check("all synonyms resolve to canonical moods",
@@ -250,7 +255,7 @@ beat = d._parse(LLMResult(json.dumps({
     "poem": {"author": "yuri", "text": "dusk\nunfolding"},
     "crack": "none"}), "stop", "m"))
 check("multi-line beat parsed", len(beat.turns) == 2)
-check("expression canonicalised in parse", beat.turns[0].expression == "nervous")
+check("expression canonicalised in parse", beat.turns[0].expression == "embarrassed")
 check("second line canonicalised", beat.turns[1].expression == "knowing")
 check("stage filters unknown girls", beat.stage == ["yuri", "natsuki"])
 check("poem parsed with author", beat.poem["author"] == "yuri")
@@ -300,6 +305,131 @@ check("blank name doesn't clobber a real one", d.player_name == "Dfdfdf")
 d._persist()
 check("player name survives restart",
       Director(d.config, session_name="__test8__").player_name == "Dfdfdf")
+
+# ── 8. this session's fixes ────────────────────────────────────────────────
+print("[truncated replies]")
+cut = ('{"turns": [{"speaker": "sayori", "expression": "laugh", "text": "Ehehe~"},'
+       ' {"speaker": "natsuki", "expression": "pout", "text": "Hmph."},'
+       ' {"speaker": "yuri", "expression": "nerv')
+b = d._parse(LLMResult(cut, "length", "m"))
+check("a reply cut off mid-JSON keeps its complete lines",
+      [t.text for t in b.turns] == ["Ehehe~", "Hmph."])
+check("...with their faces", [t.expression for t in b.turns] == ["laugh", "pout"])
+b = d._parse(LLMResult('{"turns": [{"speaker": "yur', "length", "m"))
+check("unsalvageable JSON is never read aloud as dialogue",
+      b.turns[0].text == "..." and "JSON" in (b.error or ""))
+poem_after = ('{"turns": [{"speaker": "yuri", "text": "Here..."}], "poem": '
+              '{"author": "yuri", "text": "NOT A LINE"}, "stage": ["yu')
+b = d._parse(LLMResult(poem_after, "length", "m"))
+check("salvage stops at the end of turns (a poem's text isn't a line)",
+      [t.text for t in b.turns] == ["Here..."])
+check("plain prose still renders as Monika",
+      d._parse(LLMResult("Oh! Hi there.", "stop", "m")).turns[0].text == "Oh! Hi there.")
+
+print("[narration + poems]")
+b = d._parse(LLMResult(json.dumps({"turns": [
+    {"speaker": "narrator", "text": "Natsuki crosses her arms."},
+    {"speaker": "natsuki", "expression": "pout", "text": "Hmph."}]}), "stop", "m"))
+check("narrator lines are kept as narration", b.turns[0].speaker == "narrator")
+check("narration doesn't steal a girl's line", b.turns[1].speaker == "natsuki")
+b = d._parse(LLMResult(json.dumps({"turns": [{"speaker": "natsuki", "text": "Fine."}],
+                                   "poem": {"author": "natsuki", "title": "Eagles Can Fly",
+                                            "text": "Monkeys can climb"}}), "stop", "m"))
+check("poem carries its title", b.poem == {"author": "natsuki", "title": "Eagles Can Fly",
+                                           "text": "Monkeys can climb"})
+check("new music words accepted",
+      all(D._pick(w, D._MUSIC, "keep") == w for w in ("poems", "argument", "eerie", "monika")))
+check("new rooms accepted", all(w in D._BACKGROUND for w in ("closet", "kitchen", "street")))
+
+print("[failed calls]")
+d = fresh(session="__test9__")
+d.client = FailClient()
+d.memory.add_player("earlier")
+d.memory.add_doki("{}")
+level = d.intensity
+d.respond("are you there?")
+check("a failed call doesn't leave his message stranded in memory",
+      d.memory.messages[-1]["content"] == "{}")
+check("a failed call doesn't push intensity up", d.intensity == level)
+
+print("[new runs]")
+d = fresh(session="__test10__")
+d.client = FakeClient([beat_json(), beat_json(), beat_json(text="Welcome back!")])
+d.respond("hi")
+d.respond("how's it going")
+d.escalate(4)
+first = d.start_run(player_name="Dfdfdf", trigger="seam", chapter=2,
+                    history=[{"who": "", "what": "{i}Another day passes.{/i}"},
+                             {"who": "Sayori", "what": '"Hi Dfdfdf~"'}],
+                    route={"poem_winners": ["yuri", "yuri"],
+                           "appeal": {"sayori": 0, "natsuki": 1, "yuri": 2}})
+archive = os.path.join(_TEST_MEM, "archive")
+check("starting a takeover archives the old run (not deleted)",
+      os.path.isdir(archive) and len(os.listdir(archive)) == 1)
+check("...and starts a clean transcript", len(d.memory.messages) == 2)
+check("...with fresh pacing (escalation reset; only the opening turn's drift)",
+      d.intensity < 0.5 and d.player_turns == 1, "intensity=%s" % d.intensity)
+check("...counting the return visit", d.memory.meta.get("visits") == 1)
+opening = d.client.calls[-1]["messages"][0]["content"]
+check("opening tells it the day", "Day 3" in opening)
+check("opening tells it the poem route", "Yuri's route" in opening and "yuri, yuri" in opening)
+check("opening quotes the last lines he read, tags stripped",
+      "[narration] Another day passes." in opening and 'Sayori: "Hi Dfdfdf~"' in opening)
+check("opening returns the first beat", first.turns[0].text == "Welcome back!")
+check("the seam asks it to open the club meeting", "club meeting" in opening)
+m = D._opening_message("", [], None, {}, "manual")
+check("manual takeover: continue mid-scene", "mid-scene" in m and "Day" not in m)
+
+print("[model choice]")
+d = fresh(session="__test11__")
+d.set_model("anthropic/claude-opus-5")
+check("picked model is used, with no silent fallback",
+      d.client.model == "anthropic/claude-opus-5" and d.client.fallback_model == "")
+d2 = Director(d.config, session_name="__test11__")
+check("picked model survives restarting the sidecar", d2.client.model == "anthropic/claude-opus-5")
+d2.memory.add_player("x")
+d2.memory.add_doki("y")
+d2.memory.archive()
+check("...and survives a new run", Director(d.config, session_name="__test11__").client.model
+      == "anthropic/claude-opus-5")
+check("max_tokens has a floor so 8-line beats aren't cut off",
+      LLMClient({"api_key": "k", "max_tokens": 900}).max_tokens >= 1200)
+
+import urllib.error as _ue                                      # noqa: E402
+import claude_mod.openrouter_client as _oc                      # noqa: E402
+_real_urlopen = _oc.urllib.request.urlopen
+
+
+class _Resp(object):
+    def __init__(self, body):
+        self.body = body
+
+    def read(self):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _fake_urlopen(req, timeout=None):
+    url = req.full_url
+    if "claude-opus-5/endpoints" in url:
+        return _Resp(b'{"data": {"endpoints": [{"name": "Anthropic"}]}}')
+    raise _ue.HTTPError(url, 404, "not found", {}, None)
+
+
+_oc.urllib.request.urlopen = _fake_urlopen
+cl = LLMClient({"api_key": "k"})
+check("model check: a real id passes", cl.model_exists("anthropic/claude-opus-5") is True)
+check("model check: a typo is caught (404)", cl.model_exists("anthropic/claude-opsu-5") is False)
+check("model check: ':free' variants are checked as their base id",
+      cl.model_exists("anthropic/claude-opus-5:free") is True)
+_oc.urllib.request.urlopen = lambda *a, **k: (_ for _ in ()).throw(OSError("offline"))
+check("model check: offline = can't tell (doesn't block)", cl.model_exists("a/b") is None)
+_oc.urllib.request.urlopen = _real_urlopen
 
 cleanup()
 print("\n%d passed, %d failed" % (len(PASS), len(FAIL)))

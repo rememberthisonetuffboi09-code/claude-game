@@ -1,84 +1,56 @@
-# claude_mod — setup & editing guide
+# claude_mod — the director brain
 
-The "director brain" that makes DDLC self-aware. This folder is pure Python
-(no Ren'Py imports), so you can test it on its own before it ever touches the
-game.
+This folder is the **sidecar**: pure Python 3, run on its own next to the game.
+It is never copied into DDLC (the game's engine is Python 2 and would crash).
+How it all fits together, the controls, and updating:
+[`docs/GAME_INTEGRATION.md`](../../docs/GAME_INTEGRATION.md).
 
-## 1. Install into DDLC
-Drop this whole `claude_mod/` folder and the sibling `claude_mod_hooks.rpy`
-into base DDLC's `game/` directory:
+## Setup
 
-```
-DDLC/game/claude_mod/          <- this folder
-DDLC/game/claude_mod_hooks.rpy <- the Ren'Py glue
-```
+1. **API key** — copy `config.example.json` to `config.json` and paste your
+   OpenRouter key into `"api_key"`. Set a spend limit on the key in OpenRouter.
+2. **(Optional) dossier** — copy `dossier.example.json` to `dossier.json` and
+   fill in what you already know about your friend. It's the secret sauce for
+   "how does she know that?!", and it only unlocks late in the night.
+3. **Test the key** (no game needed): `python test_connection.py`
+4. **Run it**: `python sidecar.py` — it also installs the bridge into DDLC.
 
-## 2. Add your API key
-```
-cp config.example.json config.json
-```
-Open `config.json` and paste your Anthropic key into `"api_key"`.
+## Cost
 
-> **Money safety:** set a spend cap on this key in the Anthropic console, and
-> rotate/delete it after the prank. Fable 5 is premium ($10 / $50 per million
-> tokens), and every turn resends the growing transcript — a long session adds
-> up. If it feels pricey or slow, switch `"model"` to `"claude-opus-4-8"`
-> (cheaper, faster, still excellent). It's already the refusal fallback.
-
-## 3. Fill in the dossier (the secret sauce)
-```
-cp dossier.example.json dossier.json
-```
-Put in what YOU already know about your friend — friends' names, inside jokes,
-games they love, their Discord handle. This is what makes it feel like it *knows*
-them. Leave anything blank you don't have.
-
-## 4. Test the connection (no game needed)
-```
-python test_connection.py
-```
-You should see Monika say hello. If the key is wrong or the network's blocked,
-you'll get a clear error here instead of a silent game.
-
-## 5. Add your DDLC+ HD assets
-Drop your extracted DDLC+ sprites / music / backgrounds into `hd_assets/`
-(git-ignored). Then map moods to sprite tags in `claude_mod_hooks.rpy`
-(`claude_show`, marked TODO).
-
-## 6. Wire the seam
-In DDLC's day-2 script, right after the poem/path choice, add:
-```
-jump claude_mod_takeover
-```
-
----
+Prices per million tokens (input / output) on OpenRouter: Fable 5 $10 / $50,
+Opus 5 $5 / $25, Sonnet 5 $2 / $10. Opus 5 is the sweet spot; Sonnet 5 is the
+cheap way to test. Each turn's cost is printed in the sidecar window. Prompt
+caching (on by default for Anthropic models) makes the long, repeated part of
+every request about 10% price.
 
 ## Editing the character bible
-These files are yours to tweak — the model reads them every turn:
+
+These files are yours — the model reads them every turn:
 
 | File | What it controls |
 |---|---|
-| `persona/characters.json` | How each Doki talks, acts, thinks; their meta-awareness behavior |
-| `persona/story.md` | The original DDLC story, so it can remix rather than copy |
+| `persona/characters.json` | How each Doki talks, acts, thinks; her meta-awareness |
+| `persona/story.md` | The original DDLC arc, so it can remix rather than copy |
 | `persona/examples.md` | Example lines that lock each voice |
 
-Change a voice, add a catchphrase, rewrite how Monika escalates — save the file,
-relaunch, done.
+Save, restart the sidecar, done. (`python update.py` backs up your edits
+before it replaces these files.)
 
 ## Controls & pacing
+
 | Knob | Where | Effect |
 |---|---|---|
-| `pace` | `config.json` | `slow` / `normal` / `fast` / `instant` baseline ramp |
-| `-` key | in-game | escalate now |
-| `=` key | in-game | dial it back |
+| `pace` | `config.json` | `slow` / `normal` / `fast` / `instant` — how fast the creep rises on its own |
 | `starting_intensity` | `config.json` | where the creep begins (0–10) |
 | `default_mode` | `config.json` | `story` or `monika` |
-| `effort` | `config.json` | `low` = snappy replies (default) |
+| `ddlc_game_dir` | `config.json` | only if the sidecar can't find DDLC by itself |
+| `-` / `=`, F5 / F6 | in game | creepier / calmer |
+| F10 | in game | switch model |
 
 ## Safety (enforced in code)
-- `scanner.py` is **read-only**. It reads harmless signals (username, PC name,
-  Desktop file *names*, installed Steam games) — never file contents, never
-  passwords, never Discord/account tokens.
-- The only write, `drop_note`, is **off by default**, writes one harmless `.txt`
-  into `Desktop/MonikaWasHere/`, and never overwrites or deletes anything.
-- Nothing here can harm the player's real data.
+
+- `scanner.py` is **read-only**: harmless signals (username, PC name, Desktop
+  file *names*, installed Steam games) — never file contents, passwords or
+  account tokens.
+- The only write, `drop_note`, is **off by default**, writes one harmless
+  `.txt` into `Desktop/MonikaWasHere/`, and never overwrites or deletes.

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-Cross-file consistency checks between the Python sidecar and the Ren'Py bridge.
+Cross-file contract between the Python director/sidecar and the Ren'Py bridge.
 
-These two halves ship separately (the bridge goes into DDLC's game/ folder, the
-sidecar runs on its own), so nothing but this test stops them drifting apart.
-It exists because of a real bug: the director started emitting a fixed mood
-vocabulary the bridge didn't know, so EVERY expression silently fell back to
-neutral and the girls' faces looked frozen.
+The two halves ship separately (the bridge goes into DDLC's game/ folder, the
+sidecar runs on its own), so this test is what stops them drifting apart. It
+exists because of real bugs: the director once emitted mood words the bridge
+didn't know, so every face silently fell back to neutral.
+
+Every word the director is allowed to send must map to something real on the
+bridge side, and every field the bridge reads must actually be sent.
 
 Run:  python3 tests/test_bridge_sync.py     (no network, no API credits)
 """
@@ -16,8 +18,7 @@ import os
 import re
 import sys
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.join(_HERE, "..")
+_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, os.path.join(_ROOT, "game"))
 
 from claude_mod import director as D                     # noqa: E402
@@ -28,53 +29,53 @@ SIDECAR = open(os.path.join(_ROOT, "game/claude_mod/sidecar.py"), encoding="utf-
 PASS, FAIL = [], []
 
 
-def check(name, cond):
+def check(name, cond, detail=""):
     (PASS if cond else FAIL).append(name)
-    print("  %s %s" % ("✓" if cond else "✗", name))
+    print("  %s %s%s" % ("✓" if cond else "✗", name, (" — %s" % (detail,)) if detail and not cond else ""))
 
 
-def _literal(name, opener, closer):
-    """Pull a top-level dict/list literal out of the .rpy by name."""
-    m = re.search(re.escape(name) + r"\s*=\s*(" + re.escape(opener) +
-                  r".*?\n    " + re.escape(closer) + r")", BRIDGE, re.S)
+def literal(name):
+    """A top-level dict/list literal from the bridge's init python, by name."""
+    m = re.search(r"^    " + re.escape(name) + r"\s*=\s*([\[{].*?^    [\]}])", BRIDGE, re.S | re.M)
     if not m:
         raise AssertionError("could not find %s in the bridge" % name)
     return ast.literal_eval(m.group(1))
 
 
-mood = _literal("CLAUDE_MOOD", "{", "}")
-alias = _literal("CLAUDE_MOOD_ALIAS", "{", "}")
-models = _literal("CLAUDE_MODELS", "[", "]")
+faces = literal("CLAUDE_FACES")
+alias = literal("CLAUDE_MOOD_ALIAS")
+music = literal("CLAUDE_MUSIC")
+rooms = literal("CLAUDE_BG")
 
-print("[moods: director vocabulary <-> bridge faces]")
-check("every director mood maps to a face", set(D._EXPRESSIONS) <= set(mood))
-check("each mood gets a DISTINCT face", len(set(mood.values())) == len(mood))
-check("every bridge alias resolves to a real mood",
-      all(v in mood for v in alias.values()))
-check("bridge knows every director synonym",
-      set(D._EXPR_SYNONYMS) <= set(alias) | set(mood))
-check("faces exist for all four girls (pose-1 a..r)",
-      all(len(v) == 1 and "a" <= v <= "r" for v in mood.values()))
+print("[moods]")
+for girl in ("sayori", "natsuki", "yuri", "monika"):
+    check("%s has a face for every mood the director can send" % girl,
+          set(D._EXPRESSIONS) <= set(faces[girl]), set(D._EXPRESSIONS) - set(faces[girl]))
+check("every bridge alias lands on a real mood", set(alias.values()) <= set(D._EXPRESSIONS))
+check("bridge folds every director synonym the same way",
+      all(alias.get(w) == m for w, m in D._EXPR_SYNONYMS.items()),
+      [w for w, m in D._EXPR_SYNONYMS.items() if alias.get(w) != m])
+
+print("[music + rooms]")
+check("every music word maps to a DDLC track",
+      D._MUSIC - {"keep", "stop"} <= set(music), D._MUSIC - {"keep", "stop"} - set(music))
+check("every room maps to a DDLC background",
+      D._BACKGROUND - {"keep"} <= set(rooms), D._BACKGROUND - {"keep"} - set(rooms))
+check("black is DDLC's `black` image (there is no `bg black`)", rooms["black"] == "black")
 
 print("[version handshake]")
 sv = re.search(r'SIDECAR_VERSION = "(\w+)"', SIDECAR).group(1)
 bv = re.search(r'CLAUDE_EXPECTED_SIDECAR = "(\w+)"', BRIDGE).group(1)
 check("sidecar version matches what the bridge expects (%s)" % sv, sv == bv)
 
-print("[wire format: every field the bridge reads is sent]")
+print("[wire format]")
 sent = set(re.findall(r'"(\w+)":', SIDECAR.split("def beat_to_dict")[1].split("\n\n")[0]))
-for field in ("turns", "music", "background", "effect", "stage", "poem", "error"):
-    check("sidecar sends %r" % field, field in sent)
-
-print("[model picker]")
-labels = [l for l, _ in models]
-slugs = [s for _, s in models]
-check("Opus 5 is in the picker", "anthropic/claude-opus-5" in slugs)
-check("no duplicate slugs", len(set(slugs)) == len(slugs))
-check("no duplicate labels", len(set(labels)) == len(labels))
-check("every slug is provider-qualified", all("/" in s for s in slugs))
-check("/model endpoint exists in the sidecar", '"/model"' in SIDECAR)
-print("  picker: %s" % ", ".join(labels))
+read = set(re.findall(r'r\.get\("(\w+)"', BRIDGE)) | {"turns"}
+check("the sidecar sends every field the bridge reads", read <= sent, read - sent)
+for endpoint in ("/start", "/respond", "/model", "/escalate", "/deescalate", "/health"):
+    check("sidecar serves %s" % endpoint, '"%s"' % endpoint in SIDECAR)
+used = set(re.findall(r'_claude_(?:post|get)\("(/\w+)"', BRIDGE))
+check("every endpoint the bridge calls exists", all('"%s"' % u in SIDECAR for u in used), used)
 
 print("\n%d passed, %d failed" % (len(PASS), len(FAIL)))
 if FAIL:
