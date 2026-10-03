@@ -1,0 +1,29 @@
+{
+  "_comment": "Copy to config.json (git-ignored) and add your OpenRouter key. Set a per-key spend limit in OpenRouter and rotate the key after the prank.",
+  "_provider": "OpenRouter (OpenAI-compatible). base_url + model IDs are OpenRouter's, not Anthropic's.",
+  "api_key": "sk-or-v1-PUT-YOUR-OPENROUTER-KEY-HERE",
+  "base_url": "https://openrouter.ai/api/v1/chat/completions",
+  "_model_help": "Pick from https://openrouter.ai/models (or switch in game with F10 - that choice is remembered). Per million tokens in/out: fable-5 $10/$50, opus-5 $5/$25, sonnet-5 $2/$10. The sidecar checks the id with OpenRouter at startup.",
+  "model": "anthropic/claude-fable-5",
+  "fallback_model": "anthropic/claude-opus-4.8",
+  "_free_options": [
+    "deepseek/deepseek-chat-v3-0324:free",
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "openrouter/auto"
+  ],
+  "temperature": 0.9,
+  "max_tokens": 1400,
+  "request_timeout_seconds": 90,
+  "title": "DDLC Director Mod",
+  "referer": "",
+  "default_mode": "story",
+  "pace": "normal",
+  "starting_intensity": 0,
+  "enable_local_scan": true,
+  "enable_harmless_writes": false,
+  "enable_prompt_cache": true,
+  "cache_ttl": "5m",
+  "_ddlc_help": "The sidecar finds DDLC by itself and installs the bridge into it on every start. Only if it can't: set ddlc_game_dir to your DDLC folder, e.g. C:/Users/you/Downloads/ddlc-win/DDLC-1.1.1-pc",
+  "ddlc_game_dir": "",
+  "auto_install_bridge": true
+}
